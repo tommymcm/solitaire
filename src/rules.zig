@@ -87,15 +87,29 @@ pub const GameState = struct {
     }
 
     /// Finds all indices in the field that can be captured by the card at hand_index.
-    pub fn findCaptures(self: GameState, allocator: std.mem.Allocator, hand_index: usize) ![]usize {
+    /// If mimic_index is provided, and hand[hand_index] is a Joker, it acts as hand[mimic_index].
+    pub fn findCaptures(self: GameState, allocator: std.mem.Allocator, hand_index: usize, mimic_index: ?usize) ![]usize {
         const card = self.hand[hand_index] orelse return &[_]usize{};
+        var effective_card = card;
+
+        if (card.rank == .joker) {
+            if (mimic_index) |m_idx| {
+                if (self.hand[m_idx]) |m_card| {
+                    effective_card = m_card;
+                }
+            }
+        }
+
         var indices = std.ArrayList(usize){};
         errdefer indices.deinit(allocator);
 
         for (self.field.items, 0..) |maybe_card, i| {
             if (maybe_card) |target| {
-                if (target.rank == card.rank or target.suit == card.suit) {
-                    try indices.append(allocator, i);
+                // If the effective card is still a Joker (no mimic), it captures nothing.
+                if (effective_card.rank != .joker) {
+                    if (target.rank == effective_card.rank or target.suit == effective_card.suit) {
+                        try indices.append(allocator, i);
+                    }
                 }
             }
         }
@@ -103,21 +117,12 @@ pub const GameState = struct {
     }
 
     /// Applies the play for a specific hand card.
-    pub fn applyPlay(self: *GameState, hand_index: usize) !bool {
+    pub fn applyPlay(self: *GameState, hand_index: usize, mimic_index: ?usize) !bool {
         const card = self.hand[hand_index] orelse return false;
-        const captures = try self.findCaptures(self.allocator, hand_index);
+        const captures = try self.findCaptures(self.allocator, hand_index, mimic_index);
         defer self.allocator.free(captures);
 
         if (captures.len > 0) {
-            // Sort indices in descending order to safely remove from ArrayList
-            // Actually, we are using ?Card, so we can just set to null, 
-            // but the rule usually says they are removed from the field.
-            // If we remove them, the field shrinks.
-            
-            // For now, let's keep the null-out behavior or actually remove them?
-            // "removed from field" usually means the row gets shorter.
-            
-            // To avoid shifting indices while iterating:
             var i: usize = captures.len;
             while (i > 0) {
                 i -= 1;

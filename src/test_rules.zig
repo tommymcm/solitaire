@@ -4,6 +4,43 @@ const rules = @import("rules.zig");
 const Card = card.Card;
 const GameState = rules.GameState;
 
+test "joker mimic logic" {
+    const allocator = std.testing.allocator;
+    var prng = std.Random.DefaultPrng.init(42);
+    
+    const player_deck = card.Deck.init(allocator, prng.random());
+    const enemy_deck = card.Deck.init(allocator, prng.random());
+    
+    var state = GameState{
+        .deck = player_deck,
+        .enemy_deck = enemy_deck,
+        .field = .{},
+        .hand = .{
+            Card{ .rank = .joker, .suit = .hearts },
+            Card{ .rank = .ace, .suit = .spades },
+            null, null,
+        },
+        .captured_count = 0,
+        .allocator = allocator,
+    };
+    defer state.deinit();
+
+    try state.field.append(state.allocator, Card{ .rank = .ace, .suit = .diamonds });
+    try state.field.append(state.allocator, Card{ .rank = .ten, .suit = .hearts }); // Doesn't match Joker (Joker matches nothing by default)
+
+    // Joker mimicking Ace of Spades (mimic_index = 1)
+    const captures = try state.findCaptures(allocator, 0, 1);
+    defer allocator.free(captures);
+
+    try std.testing.expectEqual(@as(usize, 1), captures.len);
+    try std.testing.expectEqual(@as(usize, 0), captures[0]); // Matches Ace of Diamonds by rank
+
+    const captured_any = try state.applyPlay(0, 1);
+    try std.testing.expect(captured_any);
+    try std.testing.expectEqual(@as(u32, 2), state.captured_count);
+    try std.testing.expect(state.hand[0] == null);
+}
+
 test "initial field deal filters aces and face cards" {
     const allocator = std.testing.allocator;
     var prng = std.Random.DefaultPrng.init(42);
@@ -64,7 +101,7 @@ test "capture logic" {
     try state.field.append(state.allocator, Card{ .rank = .four, .suit = .clubs });
     state.captured_count = 0;
 
-    const captures = try state.findCaptures(allocator, 0);
+    const captures = try state.findCaptures(allocator, 0, null);
     defer allocator.free(captures);
 
     try std.testing.expectEqual(@as(usize, 2), captures.len);
@@ -73,7 +110,7 @@ test "capture logic" {
     try std.testing.expect(captures[1] == 1); // Same suit
 
     // Test applyPlay
-    const captured_any = try state.applyPlay(0);
+    const captured_any = try state.applyPlay(0, null);
     try std.testing.expect(captured_any);
     try std.testing.expectEqual(@as(usize, 2), state.field.items.len);
     try std.testing.expect(state.hand[0] == null);
@@ -120,11 +157,11 @@ test "play to field" {
     try state.field.append(state.allocator, Card{ .rank = .king, .suit = .spades });
     try state.field.append(state.allocator, Card{ .rank = .queen, .suit = .spades });
 
-    const captures = try state.findCaptures(allocator, 0);
+    const captures = try state.findCaptures(allocator, 0, null);
     defer allocator.free(captures);
     try std.testing.expectEqual(@as(usize, 0), captures.len);
     
-    const captured_any = try state.applyPlay(0);
+    const captured_any = try state.applyPlay(0, null);
     try std.testing.expect(!captured_any);
     try std.testing.expectEqual(@as(usize, 3), state.field.items.len);
     try std.testing.expectEqual(Card{ .rank = .ace, .suit = .hearts }, state.field.items[2].?);

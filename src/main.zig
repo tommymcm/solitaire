@@ -63,7 +63,27 @@ pub fn main(init: std.process.Init) !void {
                 }
                 
                 const hand_idx = hand_choice - 1;
-                const captures = try state.findCaptures(allocator, hand_idx);
+                const card = state.hand[hand_idx].?;
+                
+                var mimic_idx: ?usize = null;
+                if (card.rank == .joker) {
+                    try stdout.print("Joker chosen! Choose a card to mimic (1-4): ", .{});
+                    try stdout.flush();
+                    if (try stdin.takeDelimiter('\n')) |mimic_line| {
+                        const m_trimmed = std.mem.trim(u8, mimic_line, " \r\n\t");
+                        if (std.fmt.parseInt(usize, m_trimmed, 10)) |m_choice| {
+                            if (m_choice >= 1 and m_choice <= 4 and state.hand[m_choice - 1] != null and (m_choice - 1) != hand_idx) {
+                                mimic_idx = m_choice - 1;
+                                try stdout.print("Joker mimicking {f}!\n", .{state.hand[mimic_idx.?].?});
+                            } else {
+                                try stdout.print("Invalid mimic choice! Joker will act as itself.\n", .{});
+                            }
+                        }
+                        stdin.toss(1); // delimiter
+                    }
+                }
+
+                const captures = try state.findCaptures(allocator, hand_idx, mimic_idx);
                 defer allocator.free(captures);
 
                 if (captures.len > 0) {
@@ -71,7 +91,7 @@ pub fn main(init: std.process.Init) !void {
                 } else {
                     try stdout.print("No captures. Card added to field.\n", .{});
                 }
-                _ = try state.applyPlay(hand_idx);
+                _ = try state.applyPlay(hand_idx, mimic_idx);
             } else |_| {
                 try stdout.print("Invalid input! Enter 1-4.\n", .{});
                 continue;
