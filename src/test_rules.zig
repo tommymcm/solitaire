@@ -4,15 +4,32 @@ const rules = @import("rules.zig");
 const Card = card.Card;
 const GameState = rules.GameState;
 
+test "deck split initialization" {
+    const allocator = std.testing.allocator;
+    var prng = std.Random.DefaultPrng.init(42);
+    var state = try GameState.init(allocator, prng.random());
+    defer state.deinit();
+
+    // Player should have: (3 ranks [2,3,4] * 4 suits) + 2 jokers = 14 cards
+    // 4 cards are in hand, so 10 in deck
+    try std.testing.expectEqual(@as(usize, 10), state.deck.count());
+    
+    // Enemy should have: 52 - 12 (ranks 2-4) = 40 cards
+    // 4 cards are in field, so 36 in enemy deck
+    try std.testing.expectEqual(@as(usize, 36), state.enemy_deck.count());
+}
+
 test "capture logic" {
     const allocator = std.testing.allocator;
     var prng = std.Random.DefaultPrng.init(42);
-    var deck = card.Deck.init(allocator, prng.random());
-    try deck.fillStandard52();
-    // Do not shuffle for predictable test
+    var player_deck = card.Deck.init(allocator, prng.random());
+    var enemy_deck = card.Deck.init(allocator, prng.random());
+    try player_deck.fillStandard52();
+    try enemy_deck.fillStandard52();
 
     var state = GameState{
-        .deck = deck,
+        .deck = player_deck,
+        .enemy_deck = enemy_deck,
         .field = .{},
         .hand = .{ null, null, null, null },
         .captured_count = 0,
@@ -65,12 +82,14 @@ test "capture logic" {
 test "play to field" {
     const allocator = std.testing.allocator;
     var prng = std.Random.DefaultPrng.init(42);
-    var deck = card.Deck.init(allocator, prng.random());
-    try deck.fillStandard52();
-    // Do not shuffle for predictable test
+    var player_deck = card.Deck.init(allocator, prng.random());
+    var enemy_deck = card.Deck.init(allocator, prng.random());
+    try player_deck.fillStandard52();
+    try enemy_deck.fillStandard52();
 
     var state = GameState{
-        .deck = deck,
+        .deck = player_deck,
+        .enemy_deck = enemy_deck,
         .field = .{},
         .hand = .{ null, null, null, null },
         .captured_count = 0,

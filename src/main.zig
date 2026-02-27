@@ -29,7 +29,7 @@ pub fn main(init: std.process.Init) !void {
         if (state.isGameOver()) break;
 
         try stdout.print("\n--- Card Capture ---\n", .{});
-        try stdout.print("Score: {} | Deck: {}\n", .{ state.captured_count, state.deck.count() });
+        try stdout.print("Score: {} | Deck: {} | Enemy Deck: {}\n", .{ state.captured_count, state.deck.count(), state.enemy_deck.count() });
 
         try stdout.print("Field: ", .{});
         for (state.field.items, 0..) |maybe_card, i| {
@@ -77,6 +77,8 @@ pub fn main(init: std.process.Init) !void {
                 continue;
             }
         }
+
+        try state.drawNextEnemy();
     }
 
     try stdout.print("\nGame Over!\nFinal Score: {}\n", .{state.captured_count});

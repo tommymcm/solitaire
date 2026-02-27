@@ -28,6 +28,7 @@ pub const Suit = enum {
 };
 
 pub const Rank = enum(u4) {
+    joker = 0,
     ace = 1,
     two,
     three,
@@ -47,6 +48,7 @@ pub const Rank = enum(u4) {
         w: *std.Io.Writer,
     ) !void {
         const s = switch (self) {
+            .joker => "Jkr",
             .ace => "A",
             .jack => "J",
             .queen => "Q",
@@ -69,6 +71,10 @@ pub const Card = struct {
         self: Card,
         w: *std.Io.Writer,
     ) !void {
+        if (self.rank == .joker) {
+            try w.writeAll("Jkr");
+            return;
+        }
         try self.rank.format(w);
         try self.suit.format(w);
     }

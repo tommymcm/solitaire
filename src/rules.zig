@@ -4,31 +4,59 @@ const Card = card_mod.Card;
 const Deck = card_mod.Deck;
 
 pub const GameState = struct {
-    deck: Deck,
+    deck: Deck, // Player's deck
+    enemy_deck: Deck,
     field: std.ArrayList(?Card),
     hand: [4]?Card,
     captured_count: u32,
     allocator: std.mem.Allocator,
 
     pub fn init(allocator: std.mem.Allocator, rng: std.Random) !GameState {
-        var deck = Deck.init(allocator, rng);
-        try deck.fillStandard52();
-        deck.shuffle();
+        var player_deck = Deck.init(allocator, rng);
+        var enemy_deck = Deck.init(allocator, rng);
+
+        // Populate decks based on rules:
+        // Player: 2-4 of each suit + 2 jokers
+        // Enemy: everything else
+        inline for (std.meta.fields(card_mod.Suit)) |s_field| {
+            const suit = @as(card_mod.Suit, @enumFromInt(s_field.value));
+            inline for (std.meta.fields(card_mod.Rank)) |r_field| {
+                const rank = @as(card_mod.Rank, @enumFromInt(r_field.value));
+                if (rank == .joker) continue; // Handle jokers separately
+
+                const c = Card{ .suit = suit, .rank = rank };
+                const rank_int = @intFromEnum(rank);
+                if (rank_int >= 2 and rank_int <= 4) {
+                    try player_deck.cards.append(allocator, c);
+                } else {
+                    try enemy_deck.cards.append(allocator, c);
+                }
+            }
+        }
+        
+        // Add 2 jokers to player deck (suit doesn't matter for jokers usually)
+        try player_deck.cards.append(allocator, .{ .suit = .hearts, .rank = .joker });
+        try player_deck.cards.append(allocator, .{ .suit = .spades, .rank = .joker });
+
+        player_deck.shuffle();
+        enemy_deck.shuffle();
 
         var state = GameState{
-            .deck = deck,
+            .deck = player_deck,
+            .enemy_deck = enemy_deck,
             .field = .{},
             .hand = .{ null, null, null, null },
             .captured_count = 0,
             .allocator = allocator,
         };
 
-        // Initial deal to field (4 cards)
+        // Initial deal to field (4 cards from ENEMY deck?)
+        // Usually if there's an enemy, the field might come from their deck.
         for (0..4) |_| {
-            try state.field.append(allocator, state.deck.draw());
+            try state.field.append(allocator, state.enemy_deck.draw());
         }
         
-        // Initial draw to hand (4 cards)
+        // Initial draw to hand (4 cards from PLAYER deck)
         state.refillHand();
 
         return state;
@@ -36,6 +64,7 @@ pub const GameState = struct {
 
     pub fn deinit(self: *GameState) void {
         self.deck.deinit();
+        self.enemy_deck.deinit();
         self.field.deinit(self.allocator);
     }
 
@@ -97,8 +126,17 @@ pub const GameState = struct {
         }
     }
 
+    /// Refills the field from the enemy deck.
+    pub fn drawNextEnemy(self: *GameState) !void {
+        while (self.field.items.len < 4) {
+            if (self.enemy_deck.draw()) |card| {
+                try self.field.append(self.allocator, card);
+            } else break;
+        }
+    }
+
     pub fn isGameOver(self: GameState) bool {
-        // Hand empty
+        // Hand empty and deck empty
         for (self.hand) |h| {
             if (h != null) return false;
         }
