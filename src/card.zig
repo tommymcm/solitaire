@@ -122,6 +122,10 @@ pub const Deck = struct {
         return self.cards.pop();
     }
 
+    pub fn putOnBottom(self: *Deck, card: Card) !void {
+        try self.cards.insert(self.allocator, 0, card);
+    }
+
     pub fn count(self: Deck) usize {
         return self.cards.items.len;
     }

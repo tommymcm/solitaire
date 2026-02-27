@@ -50,10 +50,20 @@ pub const GameState = struct {
             .allocator = allocator,
         };
 
-        // Initial deal to field (4 cards from ENEMY deck?)
-        // Usually if there's an enemy, the field might come from their deck.
-        for (0..4) |_| {
-            try state.field.append(allocator, state.enemy_deck.draw());
+        // Initial deal to field (4 cards from ENEMY deck)
+        // Rule: face cards or Aces are put at the bottom of the deck during first fill
+        var dealt: usize = 0;
+        while (dealt < 4) {
+            if (state.enemy_deck.draw()) |c| {
+                const rank_int = @intFromEnum(c.rank);
+                // Ace=1, Jack=11, Queen=12, King=13
+                if (rank_int == 1 or rank_int >= 11) {
+                    try state.enemy_deck.putOnBottom(c);
+                } else {
+                    try state.field.append(allocator, c);
+                    dealt += 1;
+                }
+            } else break;
         }
         
         // Initial draw to hand (4 cards from PLAYER deck)

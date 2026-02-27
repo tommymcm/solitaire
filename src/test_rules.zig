@@ -4,6 +4,21 @@ const rules = @import("rules.zig");
 const Card = card.Card;
 const GameState = rules.GameState;
 
+test "initial field deal filters aces and face cards" {
+    const allocator = std.testing.allocator;
+    var prng = std.Random.DefaultPrng.init(42);
+
+    var state = try GameState.init(allocator, prng.random());
+    defer state.deinit();
+    
+    for (state.field.items) |maybe_card| {
+        if (maybe_card) |c| {
+            const r = @intFromEnum(c.rank);
+            try std.testing.expect(r != 1 and r < 11);
+        }
+    }
+}
+
 test "deck split initialization" {
     const allocator = std.testing.allocator;
     var prng = std.Random.DefaultPrng.init(42);
