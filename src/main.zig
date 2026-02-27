@@ -25,11 +25,22 @@ pub fn main(init: std.process.Init) !void {
     try stdout.flush();
 
     while (!state.isGameOver()) {
+        state.refillHand();
+        if (state.isGameOver()) break;
+
         try stdout.print("\n--- Card Capture ---\n", .{});
         try stdout.print("Score: {} | Deck: {}\n", .{ state.captured_count, state.deck.count() });
 
         try stdout.print("Field: ", .{});
-        for (state.field, 0..) |maybe_card, i| {
+        for (state.field.items, 0..) |maybe_card, i| {
+            if (maybe_card) |card| {
+                try stdout.print("[{}] {f}  ", .{ i + 1, card });
+            }
+        }
+        try stdout.print("\n", .{});
+
+        try stdout.print("Hand:  ", .{});
+        for (state.hand, 0..) |maybe_card, i| {
             if (maybe_card) |card| {
                 try stdout.print("[{}] {f}  ", .{ i + 1, card });
             } else {
@@ -38,55 +49,34 @@ pub fn main(init: std.process.Init) !void {
         }
         try stdout.print("\n", .{});
 
-        const hand = state.hand orelse {
-            state.drawNext();
-            if (state.hand == null) break;
-            continue;
-        };
-        try stdout.print("Your card: {f}\n", .{hand});
-
-        const captures = try state.findCaptures(allocator);
-        defer allocator.free(captures);
-
-        try stdout.print("Enter index (1-4) to capture or 'p' to pass: ", .{});
+        try stdout.print("Choose a card from your hand (1-4) to play: ", .{});
         try stdout.flush();
 
         if (try stdin.takeDelimiter('\n')) |line| {
             const trimmed = std.mem.trim(u8, line, " \r\n\t");
-            if (trimmed.len == 0) {
+            if (trimmed.len == 0) continue;
+
+            if (std.fmt.parseInt(usize, trimmed, 10)) |hand_choice| {
+                if (hand_choice < 1 or hand_choice > 4 or state.hand[hand_choice - 1] == null) {
+                    try stdout.print("Invalid hand choice!\n", .{});
+                    continue;
+                }
+                
+                const hand_idx = hand_choice - 1;
+                const captures = try state.findCaptures(allocator, hand_idx);
+                defer allocator.free(captures);
+
+                if (captures.len > 0) {
+                    try stdout.print("Capturing {} cards!\n", .{captures.len});
+                } else {
+                    try stdout.print("No captures. Card added to field.\n", .{});
+                }
+                _ = try state.applyPlay(hand_idx);
+            } else |_| {
+                try stdout.print("Invalid input! Enter 1-4.\n", .{});
                 continue;
             }
-
-            if (std.mem.eql(u8, trimmed, "p")) {
-                if (captures.len > 0) {
-                    try stdout.print("Captures are possible! You must capture.\n", .{});
-                } else {
-                    _ = try state.applyPlay();
-                }
-            } else if (std.fmt.parseInt(usize, trimmed, 10)) |choice| {
-                if (choice < 1 or choice > 4) {
-                    try stdout.print("Choice out of range (1-4)!\n", .{});
-                } else {
-                    var is_valid_capture = false;
-                    for (captures) |c_idx| {
-                        if (c_idx == choice - 1) {
-                            is_valid_capture = true;
-                            break;
-                        }
-                    }
-
-                    if (is_valid_capture) {
-                        _ = try state.applyPlay();
-                    } else {
-                        try stdout.print("Card at index {} does not match your hand!\n", .{choice});
-                    }
-                }
-            } else |_| {
-                try stdout.print("Invalid input! Enter a number (1-4) or 'p'.\n", .{});
-            }
         }
-
-        state.drawNext();
     }
 
     try stdout.print("\nGame Over!\nFinal Score: {}\n", .{state.captured_count});
