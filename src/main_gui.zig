@@ -10,63 +10,62 @@ const Card = solitaire.card.Card;
 const SCREEN_WIDTH = 800;
 const SCREEN_HEIGHT = 450;
 
-// Card dimensions in the GUI
 const CARD_W = 80;
 const CARD_H = 110;
 const SPACING = 20;
 
-// Spritesheet info
-// Based on the image: 14 columns (Back/Joker + A-K), 4 rows (Suits)
 const SHEET_COLS = 14;
 const SHEET_ROWS = 4;
 
-// Global state
+// Use a fixed buffer for the allocator to avoid any issues with global GPA initialization
+var gpa_instance = std.heap.GeneralPurposeAllocator(.{ .stack_trace_frames = 0 }){};
+
 var global_state: ?*GameState = null;
-var global_allocator: std.mem.Allocator = undefined;
-var native_gpa = std.heap.GeneralPurposeAllocator(.{}){};
-var card_texture: rl.Texture2D = undefined;
+var card_texture: ?rl.Texture2D = null;
 
 pub fn main() !void {
-    // Memory allocator.
-    if (builtin.os.tag == .emscripten) {
-        global_allocator = std.heap.wasm_allocator;
-    } else {
-        global_allocator = native_gpa.allocator();
-    }
+    const allocator = if (builtin.os.tag == .emscripten)
+        std.heap.wasm_allocator
+    else
+        gpa_instance.allocator();
 
-    // Pseudo-random value generator.
-    var seed: u64 = undefined;
-    try std.posix.getrandom(std.mem.asBytes(&seed));
-    var prng = std.Random.DefaultPrng.init(seed);
+    std.debug.print("Initializing window...\n", .{});
+    rl.initWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Card Capture - Debugging");
+    
+    // Seed PRNG
+    std.debug.print("Initializing PRNG...\n", .{});
+    var prng = std.Random.DefaultPrng.init(42); // Hardcoded for now to avoid getrandom issues
     const random = prng.random();
 
-    // Initialize raylib.
-    rl.initWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Card Capture - Rendering Cards");
+    std.debug.print("Loading texture...\n", .{});
+    // Load texture and handle potential failure gracefully
+    const tex = rl.loadTexture("assets/cards.png") catch |err| {
+        std.debug.print("Failed to load texture: {}\n", .{err});
+        return err;
+    };
+    card_texture = tex;
 
-    // Load assets
-    card_texture = try rl.loadTexture("assets/cards.png");
-
-    // Initialize game state on heap.
-    const state = try global_allocator.create(GameState);
-    state.* = try GameState.init(global_allocator, random);
+    std.debug.print("Initializing game state...\n", .{});
+    const state = try allocator.create(GameState);
+    state.* = try GameState.init(allocator, random);
     global_state = state;
 
+    std.debug.print("Starting main loop...\n", .{});
     if (builtin.os.tag == .emscripten) {
         rl.setTargetFPS(60);
         emscripten.emscripten_set_main_loop(updateDrawFrame, 0, 1);
     } else {
         defer rl.closeWindow();
-        defer rl.unloadTexture(card_texture);
+        defer if (card_texture) |t| rl.unloadTexture(t);
         defer {
             if (global_state) |gs| {
                 gs.deinit();
-                global_allocator.destroy(gs);
+                allocator.destroy(gs);
             }
-            _ = native_gpa.deinit();
+            _ = gpa_instance.deinit();
         }
 
         rl.setTargetFPS(60);
-
         while (!rl.windowShouldClose()) {
             updateDrawFrame();
         }
@@ -79,77 +78,55 @@ export fn updateDrawFrame() void {
 
     rl.clearBackground(.dark_green);
 
-    if (global_state) |state| {
-        // 1. Opponent's Deck Area (Show Back)
-        drawCardBack(20, 20);
-        rl.drawText("Enemy Deck", 20, 20 + CARD_H + 5, 10, .light_gray);
+    const state = global_state orelse {
+        rl.drawText("Error: Global state is null", 10, 10, 20, .red);
+        return;
+    };
 
-        // 2. Field Area (4 slots)
-        const field_start_x = 210;
-        const field_y = 150;
-        rl.drawText("Field", field_start_x, field_y - 25, 20, .light_gray);
-        for (state.field, 0..) |maybe_card, i| {
-            const x = field_start_x + @as(i32, @intCast(i)) * (CARD_W + SPACING);
-            drawSlot(x, field_y);
-            if (maybe_card) |card| {
-                drawCard(x, field_y, card);
-            }
-        }
+    const tex = card_texture orelse {
+        rl.drawText("Error: Texture is null", 10, 10, 20, .red);
+        return;
+    };
 
-        // 3. Hand Area (4 slots)
-        const hand_start_x = 210;
-        const hand_y = 300;
-        rl.drawText("Your Hand", hand_start_x, hand_y - 25, 20, .light_gray);
-        for (state.hand, 0..) |maybe_card, i| {
-            const x = hand_start_x + @as(i32, @intCast(i)) * (CARD_W + SPACING);
-            drawSlot(x, hand_y);
-            if (maybe_card) |card| {
-                drawCard(x, hand_y, card);
-            }
-        }
-
-        // 4. Player's Deck Area (Show Back if not empty)
-        if (state.deck.count() > 0) {
-            drawCardBack(20, 300);
+    // Draw field
+    const field_start_x = 210;
+    const field_y = 150;
+    for (state.field, 0..) |maybe_card, i| {
+        const x = field_start_x + @as(i32, @intCast(i)) * (CARD_W + SPACING);
+        if (maybe_card) |card| {
+            drawCard(tex, x, field_y, card);
         } else {
-            drawSlot(20, 300);
+            rl.drawRectangleLines(x, field_y, CARD_W, CARD_H, .gray);
         }
-        rl.drawText("Your Deck", 20, 300 + CARD_H + 5, 10, .light_gray);
-
-        // 5. Discard Pile Area (Show Top Card if not empty)
-        const discard_x = 700;
-        const discard_y = 300;
-        drawSlot(discard_x, discard_y);
-        if (state.discard_pile.count() > 0) {
-            // Peek at top card (end of list)
-            const items = state.discard_pile.cards.items;
-            drawCard(discard_x, discard_y, items[items.len - 1]);
-        }
-        rl.drawText("Discard", discard_x, discard_y + CARD_H + 5, 10, .light_gray);
-        
-        // Info
-        var buf: [64]u8 = undefined;
-        const score_text = std.fmt.bufPrintZ(&buf, "Score: {d}", .{state.captured_count}) catch "Score: ERROR";
-        rl.drawText(score_text, 10, SCREEN_HEIGHT - 30, 20, .ray_white);
     }
+
+    // Draw hand
+    const hand_start_x = 210;
+    const hand_y = 300;
+    for (state.hand, 0..) |maybe_card, i| {
+        const x = hand_start_x + @as(i32, @intCast(i)) * (CARD_W + SPACING);
+        if (maybe_card) |card| {
+            drawCard(tex, x, hand_y, card);
+        } else {
+            rl.drawRectangleLines(x, hand_y, CARD_W, CARD_H, .gray);
+        }
+    }
+
+    rl.drawText("Card Capture - Rendering Debug", 10, SCREEN_HEIGHT - 30, 20, .white);
 }
 
-fn drawSlot(x: i32, y: i32) void {
-    rl.drawRectangleLines(x, y, CARD_W, CARD_H, .gray);
-}
-
-fn drawCard(x: i32, y: i32, card: Card) void {
-    const sw = @as(f32, @floatFromInt(card_texture.width)) / @as(f32, @floatFromInt(SHEET_COLS));
-    const sh = @as(f32, @floatFromInt(card_texture.height)) / @as(f32, @floatFromInt(SHEET_ROWS));
+fn drawCard(tex: rl.Texture2D, x: i32, y: i32, card: Card) void {
+    const sw = @as(f32, @floatFromInt(tex.width)) / @as(f32, @floatFromInt(SHEET_COLS));
+    const sh = @as(f32, @floatFromInt(tex.height)) / @as(f32, @floatFromInt(SHEET_ROWS));
 
     var col: f32 = undefined;
     var row: f32 = undefined;
 
     if (card.rank == .joker) {
         col = 0;
-        row = 1; // Joker is Row 1, Col 0
+        row = 1;
     } else {
-        col = @as(f32, @floatFromInt(@intFromEnum(card.rank))); // Ace is 1, so Col 1
+        col = @as(f32, @floatFromInt(@intFromEnum(card.rank)));
         row = switch (card.suit) {
             .spades => 0,
             .hearts => 1,
@@ -172,26 +149,5 @@ fn drawCard(x: i32, y: i32, card: Card) void {
         .height = @as(f32, @floatFromInt(CARD_H)),
     };
 
-    rl.drawTexturePro(card_texture, src, dest, .{ .x = 0, .y = 0 }, 0, .white);
-}
-
-fn drawCardBack(x: i32, y: i32) void {
-    const sw = @as(f32, @floatFromInt(card_texture.width)) / @as(f32, @floatFromInt(SHEET_COLS));
-    const sh = @as(f32, @floatFromInt(card_texture.height)) / @as(f32, @floatFromInt(SHEET_ROWS));
-
-    const src = rl.Rectangle{
-        .x = 0, // Card back is Row 0, Col 0
-        .y = 0,
-        .width = sw,
-        .height = sh,
-    };
-
-    const dest = rl.Rectangle{
-        .x = @as(f32, @floatFromInt(x)),
-        .y = @as(f32, @floatFromInt(y)),
-        .width = @as(f32, @floatFromInt(CARD_W)),
-        .height = @as(f32, @floatFromInt(CARD_H)),
-    };
-
-    rl.drawTexturePro(card_texture, src, dest, .{ .x = 0, .y = 0 }, 0, .white);
+    rl.drawTexturePro(tex, src, dest, .{ .x = 0, .y = 0 }, 0, .white);
 }
