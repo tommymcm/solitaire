@@ -91,16 +91,18 @@ pub fn main(init: std.process.Init) !void {
                 }
 
                 var has_joker = false;
+                var has_suited_in_selection = false;
                 for (hand_indices[0..hand_count]) |idx| {
                     if (state.hand[idx].?.rank == .joker) {
                         has_joker = true;
-                        break;
+                    } else {
+                        has_suited_in_selection = true;
                     }
                 }
 
                 var joker_mimic: ?solitaire.card.Card = null;
-                if (has_joker) {
-                    try stdout.print("Joker included! Choose a card index in hand to mimic (1-4): ", .{});
+                if (has_joker and !has_suited_in_selection) {
+                    try stdout.print("Joker selection with no suited cards! Choose a card index in hand to mimic (1-4): ", .{});
                     try stdout.flush();
                     const m_line = (try stdin.takeDelimiter('\n')) orelse continue;
                     const m_trimmed = std.mem.trim(u8, m_line, " \r\n\t");

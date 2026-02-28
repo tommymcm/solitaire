@@ -63,32 +63,22 @@ test "joker mimic capture" {
         state.field[i] = null;
     }
 
-    // Hand: Joker, 2 of Hearts
+    // Hand: Joker, 2 of Hearts, Ace of Hearts
     state.hand[0] = Card{ .rank = .joker, .suit = .hearts };
     state.hand[1] = Card{ .rank = .two, .suit = .hearts };
+    state.hand[2] = Card{ .rank = .ace, .suit = .hearts };
 
     // Field: 10 of Hearts
     state.field[0] = Card{ .rank = .ten, .suit = .hearts };
 
-    // Mimic Ace (value 14) of Hearts
-    const mimic_ace = Card{ .rank = .ace, .suit = .hearts };
-    const hand_indices = [_]usize{ 0 };
-
-    // Joker as Ace of Hearts can capture 10 of Hearts (14 >= 10)
-    try std.testing.expect(state.canCapture(&hand_indices, 0, mimic_ace));
-
-    // Joker as 2 of Hearts cannot capture 10 of Hearts (2 < 10)
-    const mimic_two = Card{ .rank = .two, .suit = .hearts };
-    try std.testing.expect(!state.canCapture(&hand_indices, 0, mimic_two));
-
-    // Joker + 2 of Hearts, mimicking 2 of Hearts: (2+2 = 4 < 10)
+    // Selection: Joker + 2 of Hearts
     const hand_indices_two = [_]usize{ 0, 1 };
-    try std.testing.expect(!state.canCapture(&hand_indices_two, 0, mimic_two));
+    
+    // Auto-mimic will pick Ace of Hearts from hand[2]
+    // Total value: 14 + 2 = 16. 16 >= 10.
+    try std.testing.expect(state.canCapture(&hand_indices_two, 0, null));
 
-    // Joker + 2 of Hearts, mimicking Ace of Hearts: (14+2 = 16 >= 10)
-    try std.testing.expect(state.canCapture(&hand_indices_two, 0, mimic_ace));
-
-    const success = try state.applyCapture(&hand_indices_two, 0, mimic_ace);
+    const success = try state.applyCapture(&hand_indices_two, 0, null);
     try std.testing.expect(success);
 }
 
@@ -135,6 +125,42 @@ test "deck refill from discard pile" {
     try std.testing.expect(state.hand[0] != null);
     try std.testing.expect(state.hand[1] != null);
     try std.testing.expectEqual(@as(usize, 0), state.deck.count());
+}
+
+test "automated joker mimic" {
+    const allocator = std.testing.allocator;
+    var prng = std.Random.DefaultPrng.init(42);
+    const random = prng.random();
+    
+    var state = try GameState.init(allocator, random);
+    defer state.deinit();
+
+    // Clear hand and field
+    for (0..4) |i| {
+        state.hand[i] = null;
+        state.field[i] = null;
+    }
+
+    // Hand: Joker, 2 of Hearts, 4 of Hearts, 10 of Spades
+    state.hand[0] = Card{ .rank = .joker, .suit = .hearts };
+    state.hand[1] = Card{ .rank = .two, .suit = .hearts };
+    state.hand[2] = Card{ .rank = .four, .suit = .hearts };
+    state.hand[3] = Card{ .rank = .ten, .suit = .spades };
+
+    // Field: 6 of Hearts
+    state.field[0] = Card{ .rank = .six, .suit = .hearts };
+
+    // Select: Joker + 2 of Hearts.
+    // Joker should mimic 4 of Hearts (highest heart in hand).
+    // Total value: 4 + 2 = 6. 6 >= 6. Should capture.
+    const hand_indices = [_]usize{ 0, 1 };
+    
+    // Pass null for joker_mimic to ensure auto-mimic kicks in
+    try std.testing.expect(state.canCapture(&hand_indices, 0, null));
+
+    const success = try state.applyCapture(&hand_indices, 0, null);
+    try std.testing.expect(success);
+    try std.testing.expect(state.field[0] == null);
 }
 
 test "delay logic" {
