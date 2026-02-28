@@ -100,52 +100,52 @@ pub const Card = struct {
 };
 
 pub const Deck = struct {
-    cards: std.ArrayListUnmanaged(Card),
+    cards: [54]Card = undefined,
+    len: usize = 0,
     rng: std.Random,
-    allocator: std.mem.Allocator,
 
-    pub fn init(allocator: std.mem.Allocator, rng: std.Random) Deck {
+    pub fn init(_: std.mem.Allocator, rng: std.Random) Deck {
         return .{
-            .cards = .{},
             .rng = rng,
-            .allocator = allocator,
         };
     }
 
-    pub fn deinit(self: *Deck) void {
-        self.cards.deinit(self.allocator);
-    }
-
-    pub fn fillStandard52(self: *Deck) !void {
-        try self.cards.resize(self.allocator, 0);
-        inline for (std.meta.fields(Suit)) |s_field| {
-            const suit = @as(Suit, @enumFromInt(s_field.value));
-            inline for (std.meta.fields(Rank)) |r_field| {
-                const rank = @as(Rank, @enumFromInt(r_field.value));
-                try self.cards.append(self.allocator, .{ .suit = suit, .rank = rank });
-            }
-        }
-    }
+    pub fn deinit(_: *Deck) void {}
 
     pub fn shuffle(self: *Deck) void {
-        const slice = self.cards.items;
-        if (slice.len < 2) return;
-        var i: usize = slice.len - 1;
+        if (self.len < 2) return;
+        var i: usize = self.len - 1;
         while (i > 0) : (i -= 1) {
             const j = self.rng.uintLessThan(usize, i + 1);
-            std.mem.swap(Card, &slice[i], &slice[j]);
+            std.mem.swap(Card, &self.cards[i], &self.cards[j]);
         }
     }
 
     pub fn draw(self: *Deck) ?Card {
-        return self.cards.pop();
+        if (self.len == 0) return null;
+        const card = self.cards[self.len - 1];
+        self.len -= 1;
+        return card;
     }
 
     pub fn putOnBottom(self: *Deck, card: Card) !void {
-        try self.cards.insert(self.allocator, 0, card);
+        if (self.len >= 54) return error.DeckFull;
+        // Shift right
+        var i: usize = self.len;
+        while (i > 0) : (i -= 1) {
+            self.cards[i] = self.cards[i - 1];
+        }
+        self.cards[0] = card;
+        self.len += 1;
+    }
+
+    pub fn append(self: *Deck, card: Card) !void {
+        if (self.len >= 54) return error.DeckFull;
+        self.cards[self.len] = card;
+        self.len += 1;
     }
 
     pub fn count(self: Deck) usize {
-        return self.cards.items.len;
+        return self.len;
     }
 };

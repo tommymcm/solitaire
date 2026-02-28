@@ -41,32 +41,34 @@ pub const GameState = struct {
     }
 
     pub fn init(allocator: std.mem.Allocator, rng: std.Random) !GameState {
+        std.debug.print("Rules: init start\n", .{});
         var player_deck = Deck.init(allocator, rng);
         var enemy_deck = Deck.init(allocator, rng);
 
+        std.debug.print("Rules: populating decks\n", .{});
         // Populate decks based on rules:
         // Player: 2-4 of each suit + 2 jokers
         // Enemy: everything else
-        inline for (std.meta.fields(card_mod.Suit)) |s_field| {
-            const suit = @as(card_mod.Suit, @enumFromInt(s_field.value));
-            inline for (std.meta.fields(card_mod.Rank)) |r_field| {
-                const rank = @as(card_mod.Rank, @enumFromInt(r_field.value));
+        for (std.enums.values(card_mod.Suit)) |suit| {
+            for (std.enums.values(card_mod.Rank)) |rank| {
                 if (rank == .joker) continue; // Handle jokers separately
 
                 const c = Card{ .suit = suit, .rank = rank };
                 const rank_int = @intFromEnum(rank);
                 if (rank_int >= 2 and rank_int <= 4) {
-                    try player_deck.cards.append(allocator, c);
+                    try player_deck.append(c);
                 } else {
-                    try enemy_deck.cards.append(allocator, c);
+                    try enemy_deck.append(c);
                 }
             }
         }
 
+        std.debug.print("Rules: adding jokers\n", .{});
         // Add 2 jokers to player deck (suit doesn't matter for jokers usually)
-        try player_deck.cards.append(allocator, .{ .suit = .hearts, .rank = .joker });
-        try player_deck.cards.append(allocator, .{ .suit = .spades, .rank = .joker });
+        try player_deck.append(.{ .suit = .hearts, .rank = .joker });
+        try player_deck.append(.{ .suit = .spades, .rank = .joker });
 
+        std.debug.print("Rules: shuffling\n", .{});
         enemy_deck.shuffle();
         player_deck.shuffle();
 
@@ -80,6 +82,7 @@ pub const GameState = struct {
             .allocator = allocator,
         };
 
+        std.debug.print("Rules: dealing initial field\n", .{});
         // Initial deal to field (4 cards from ENEMY deck)
         // Rule: face cards or Aces are put at the bottom of the deck during first fill
         var dealt: usize = 0;
@@ -90,10 +93,10 @@ pub const GameState = struct {
                 if (rank_int == 1 or rank_int >= 11) {
                     try state.enemy_deck.putOnBottom(c);
                 } else {
-                    var i: i8 = 0;
+                    var i: usize = 0;
                     while (i < 4) : (i += 1) {
-                        if (state.field[@intCast(i)] == null) {
-                            state.field[@intCast(i)] = c;
+                        if (state.field[i] == null) {
+                            state.field[i] = c;
                             break;
                         }
                     }
@@ -102,9 +105,11 @@ pub const GameState = struct {
             } else break;
         }
 
+        std.debug.print("Rules: refilling hand\n", .{});
         // Initial draw to hand (4 cards from PLAYER deck)
         state.refillHand();
 
+        std.debug.print("Rules: init done\n", .{});
         return state;
     }
 
@@ -176,7 +181,7 @@ pub const GameState = struct {
                     if (self.discard_pile.count() > 0) {
                         // Move discard pile to deck and shuffle
                         while (self.discard_pile.draw()) |c| {
-                            self.deck.cards.append(self.allocator, c) catch {};
+                            self.deck.append(c) catch {};
                         }
                         self.deck.shuffle();
                         self.hand[i] = self.deck.draw();
@@ -294,14 +299,14 @@ pub const GameState = struct {
         // Capture the field card
         const target = self.field[field_idx].?;
         self.field[field_idx] = null;
-        try self.discard_pile.cards.append(self.allocator, target);
+        try self.discard_pile.append(target);
         self.captured_count += 1; // Only field cards increase score
 
         // Remove hand cards and add them to discard pile
         for (hand_indices) |idx| {
             const h_card = self.hand[idx].?;
             self.hand[idx] = null;
-            try self.discard_pile.cards.append(self.allocator, h_card);
+            try self.discard_pile.append(h_card);
         }
 
         return true;
@@ -311,7 +316,7 @@ pub const GameState = struct {
         for (indices) |idx| {
             if (idx < 4) {
                 if (self.hand[idx]) |c| {
-                    try self.discard_pile.cards.append(self.allocator, c);
+                    try self.discard_pile.append(c);
                     self.hand[idx] = null;
                 }
             }
