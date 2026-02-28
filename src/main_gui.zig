@@ -17,11 +17,12 @@ const SPACING = 20;
 const SHEET_COLS = 14;
 const SHEET_ROWS = 4;
 
-// Use a fixed buffer for the allocator to avoid any issues with global GPA initialization
+// GLOBALS are necessary for Emscripten because the main() stack is unrolled
 var gpa_instance = std.heap.GeneralPurposeAllocator(.{ .stack_trace_frames = 0 }){};
-
-var global_state: ?*GameState = null;
-var card_texture: ?rl.Texture2D = null;
+var prng_instance: std.Random.DefaultPrng = undefined;
+var global_state: GameState = undefined;
+var card_texture: rl.Texture2D = undefined;
+var is_initialized: bool = false;
 
 pub fn main() !void {
     const allocator = if (builtin.os.tag == .emscripten)
@@ -29,39 +30,30 @@ pub fn main() !void {
     else
         gpa_instance.allocator();
 
-    std.debug.print("Initializing window...\n", .{});
-    rl.initWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Card Capture - Debugging");
+    rl.traceLog(.info, "GUI: Initializing window", .{});
+    rl.initWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Card Capture");
     
-    // Seed PRNG
-    std.debug.print("Initializing PRNG...\n", .{});
-    var prng = std.Random.DefaultPrng.init(42); // Hardcoded for now to avoid getrandom issues
-    const random = prng.random();
+    rl.traceLog(.info, "GUI: Initializing PRNG", .{});
+    prng_instance = std.Random.DefaultPrng.init(42);
+    const random = prng_instance.random();
 
-    std.debug.print("Loading texture...\n", .{});
-    // Load texture and handle potential failure gracefully
-    const tex = rl.loadTexture("assets/cards.png") catch |err| {
-        std.debug.print("Failed to load texture: {}\n", .{err});
-        return err;
-    };
-    card_texture = tex;
+    rl.traceLog(.info, "GUI: Loading texture", .{});
+    card_texture = try rl.loadTexture("assets/cards.png");
 
-    std.debug.print("Initializing game state...\n", .{});
-    const state = try allocator.create(GameState);
-    state.* = try GameState.init(allocator, random);
-    global_state = state;
+    rl.traceLog(.info, "GUI: Initializing game state", .{});
+    // Initialize into the global variable
+    global_state = try GameState.init(allocator, random);
+    is_initialized = true;
 
-    std.debug.print("Starting main loop...\n", .{});
+    rl.traceLog(.info, "GUI: Starting main loop", .{});
     if (builtin.os.tag == .emscripten) {
         rl.setTargetFPS(60);
         emscripten.emscripten_set_main_loop(updateDrawFrame, 0, 1);
     } else {
         defer rl.closeWindow();
-        defer if (card_texture) |t| rl.unloadTexture(t);
+        defer rl.unloadTexture(card_texture);
         defer {
-            if (global_state) |gs| {
-                gs.deinit();
-                allocator.destroy(gs);
-            }
+            global_state.deinit();
             _ = gpa_instance.deinit();
         }
 
@@ -78,23 +70,18 @@ export fn updateDrawFrame() void {
 
     rl.clearBackground(.dark_green);
 
-    const state = global_state orelse {
-        rl.drawText("Error: Global state is null", 10, 10, 20, .red);
+    if (!is_initialized) {
+        rl.drawText("Initializing...", 10, 10, 20, .red);
         return;
-    };
-
-    const tex = card_texture orelse {
-        rl.drawText("Error: Texture is null", 10, 10, 20, .red);
-        return;
-    };
+    }
 
     // Draw field
     const field_start_x = 210;
     const field_y = 150;
-    for (state.field, 0..) |maybe_card, i| {
+    for (global_state.field, 0..) |maybe_card, i| {
         const x = field_start_x + @as(i32, @intCast(i)) * (CARD_W + SPACING);
         if (maybe_card) |card| {
-            drawCard(tex, x, field_y, card);
+            drawCard(card_texture, x, field_y, card);
         } else {
             rl.drawRectangleLines(x, field_y, CARD_W, CARD_H, .gray);
         }
@@ -103,16 +90,16 @@ export fn updateDrawFrame() void {
     // Draw hand
     const hand_start_x = 210;
     const hand_y = 300;
-    for (state.hand, 0..) |maybe_card, i| {
+    for (global_state.hand, 0..) |maybe_card, i| {
         const x = hand_start_x + @as(i32, @intCast(i)) * (CARD_W + SPACING);
         if (maybe_card) |card| {
-            drawCard(tex, x, hand_y, card);
+            drawCard(card_texture, x, hand_y, card);
         } else {
             rl.drawRectangleLines(x, hand_y, CARD_W, CARD_H, .gray);
         }
     }
 
-    rl.drawText("Card Capture - Rendering Debug", 10, SCREEN_HEIGHT - 30, 20, .white);
+    rl.drawText("Card Capture - Rendering Cards", 10, SCREEN_HEIGHT - 30, 20, .white);
 }
 
 fn drawCard(tex: rl.Texture2D, x: i32, y: i32, card: Card) void {
