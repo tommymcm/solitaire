@@ -11,14 +11,16 @@ const SCREEN_HEIGHT = 450;
 
 // Global state pointer for Emscripten callback to access.
 var global_state: ?*GameState = null;
+var global_allocator: std.mem.Allocator = undefined;
 var native_gpa = std.heap.GeneralPurposeAllocator(.{}){};
 
 pub fn main() !void {
     // Memory allocator.
-    const allocator = if (builtin.os.tag == .emscripten)
-        std.heap.wasm_allocator
-    else 
-        native_gpa.allocator();
+    if (builtin.os.tag == .emscripten) {
+        global_allocator = std.heap.wasm_allocator;
+    } else {
+        global_allocator = native_gpa.allocator();
+    }
 
     // Pseudo-random value generator.
     var seed: u64 = undefined;
@@ -27,21 +29,27 @@ pub fn main() !void {
     const random = prng.random();
 
     // Initialize raylib.
+    std.debug.print("Initializing window...\n", .{});
     rl.initWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Card Capture - GUI");
 
-    // Initialize game state.
-    var state = try GameState.init(allocator, random);
-    global_state = &state;
+    // Initialize game state on heap to be safe with Emscripten stack.
+    std.debug.print("Initializing game state...\n", .{});
+    const state = try global_allocator.create(GameState);
+    state.* = try GameState.init(global_allocator, random);
+    global_state = state;
 
     if (builtin.os.tag == .emscripten) {
-        // Emscripten loop:
-        // simulate_infinite_loop = 1 stops execution of main here via exception.
+        std.debug.print("Starting Emscripten main loop...\n", .{});
+        rl.setTargetFPS(60);
         emscripten.emscripten_set_main_loop(updateDrawFrame, 0, 1);
     } else {
-        // Native loop:
+        std.debug.print("Starting native main loop...\n", .{});
         defer rl.closeWindow();
-        defer state.deinit();
-        defer _ = native_gpa.deinit();
+        defer {
+            global_state.?.deinit();
+            global_allocator.destroy(global_state.?);
+            _ = native_gpa.deinit();
+        }
 
         rl.setTargetFPS(60);
 
@@ -52,15 +60,21 @@ pub fn main() !void {
 }
 
 export fn updateDrawFrame() void {
-    // Update
-    // if (global_state) |state| { _ = state; }
-
     // Draw
     rl.beginDrawing();
     defer rl.endDrawing();
 
-    rl.clearBackground(.ray_white);
+    // Clear to RED to confirm drawing is happening.
+    // If it stays black, Raylib is not even clearing the buffer.
+    rl.clearBackground(.red);
 
-    rl.drawText("Card Capture GUI", 190, 200, 20, .dark_gray);
-    rl.drawText("Window should now stay open!", 190, 230, 20, .light_gray);
+    rl.drawText("Card Capture GUI", 190, 200, 20, .white);
+    rl.drawText("If you see RED, drawing is working!", 190, 230, 20, .light_gray);
+    
+    if (global_state) |state| {
+        // We use a fixed buffer for score to avoid allocation in loop
+        var buf: [64]u8 = undefined;
+        const score_text = std.fmt.bufPrintZ(&buf, "Score: {d}", .{state.captured_count}) catch "Score: ERROR";
+        rl.drawText(score_text, 10, 10, 20, .white);
+    }
 }
