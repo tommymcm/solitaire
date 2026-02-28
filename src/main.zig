@@ -31,9 +31,9 @@ pub fn main(init: std.process.Init) !void {
         if (state.isGameOver()) break;
 
         try stdout.print("\n==================================================\n", .{});
-        try stdout.print("Score: {} | Deck: {} | Discard: {} | Enemy: {}\n", .{ 
-            state.captured_count, 
-            state.deck.count(), 
+        try stdout.print("Score: {} | Deck: {} | Discard: {} | Enemy: {}\n", .{
+            state.captured_count,
+            state.deck.count(),
             state.discard_pile.count(),
             state.enemy_deck.count(),
         });
@@ -75,9 +75,17 @@ pub fn main(init: std.process.Init) !void {
                 var hand_count: usize = 0;
 
                 var it = std.mem.tokenizeAny(u8, h_line, ", ");
-                while (it.next()) |token| {
+                select_loop: while (it.next()) |token| {
                     if (std.fmt.parseInt(usize, token, 10)) |idx| {
+
+                        // Ensure this is a valid index.
                         if (idx >= 1 and idx <= 4) {
+                            // Skip duplicate indices.
+                            for (0..hand_count) |jdx| {
+                                if (hand_indices[jdx] == idx - 1)
+                                    continue :select_loop;
+                            }
+
                             hand_indices[hand_count] = idx - 1;
                             hand_count += 1;
                         }
@@ -177,9 +185,15 @@ pub fn main(init: std.process.Init) !void {
                 var hand_indices: [2]usize = undefined;
                 var count: usize = 0;
                 var it = std.mem.tokenizeAny(u8, h_line, ", ");
-                while (it.next()) |token| {
+                delay_loop: while (it.next()) |token| {
                     if (std.fmt.parseInt(usize, token, 10)) |idx| {
                         if (idx >= 1 and idx <= 4 and count < 2) {
+                            // Skip duplicate indices.
+                            for (0..count) |jdx| {
+                                if (hand_indices[jdx] == idx - 1)
+                                    continue :delay_loop;
+                            }
+
                             hand_indices[count] = idx - 1;
                             count += 1;
                         }
@@ -232,9 +246,15 @@ pub fn main(init: std.process.Init) !void {
             var discard_indices: [4]usize = undefined;
             var d_count: usize = 0;
             var d_it = std.mem.tokenizeAny(u8, d_line, ", ");
-            while (d_it.next()) |token| {
+            discard_loop: while (d_it.next()) |token| {
                 if (std.fmt.parseInt(usize, token, 10)) |idx| {
                     if (idx >= 1 and idx <= 4) {
+                        // Skip duplicate indices.
+                        for (0..d_count) |jdx| {
+                            if (discard_indices[jdx] == idx - 1)
+                                continue :discard_loop;
+                        }
+
                         discard_indices[d_count] = idx - 1;
                         d_count += 1;
                     }
