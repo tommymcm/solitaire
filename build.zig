@@ -1,143 +1,87 @@
 const std = @import("std");
+const rlz = @import("raylib_zig");
 
-// Although this function looks imperative, it does not perform the build
-// directly and instead it mutates the build graph (`b`) that will be then
-// executed by an external runner. The functions in `std.Build` implement a DSL
-// for defining build steps and express dependencies between them, allowing the
-// build runner to parallelize the build automatically (and the cache system to
-// know when a step doesn't need to be re-run).
-pub fn build(b: *std.Build) void {
-    // Standard target options.
+pub fn build(b: *std.Build) !void {
     const target = b.standardTargetOptions(.{});
-
-    // Standard optimization options:
-    //   Debug, ReleaseSafe, ReleaseFast, and ReleaseSmall.
     const optimize = b.standardOptimizeOption(.{});
 
-    // // Add raylib dependency.
-    // const raylib_dep = b.dependency("raylib_zig", .{
-    //     .target = target,
-    //     .optimize = optimize,
-    // });
+    const raylib_dep = b.dependency("raylib_zig", .{
+        .target = target,
+        .optimize = optimize,
+    });
 
-    // // ... unpack raylib build components.
-    // const raylib = raylib_dep.module("raylib"); // main raylib module
-    // const raygui = raylib_dep.module("raygui"); // raygui module
-    // const raylib_artifact = raylib_dep.artifact("raylib"); // raylib C library
-
-    // Solitaire module.
-    const mod = b.addModule("solitaire", .{
+    const solitaire_mod = b.addModule("solitaire", .{
         .root_source_file = b.path("src/root.zig"),
         .target = target,
     });
 
-    // Solitaire executable.
-    const exe = b.addExecutable(.{
-        .name = "solitaire",
-        .root_module = b.createModule(.{
-            .root_source_file = b.path("src/main.zig"),
+    if (target.query.os_tag == .emscripten) {
+        const emsdk = rlz.emsdk;
+        const raylib_artifact = raylib_dep.artifact("raylib");
 
-            // Target and Optimization Options.
-            .target = target,
+        const wasm = b.addLibrary(.{
+            .name = "solitaire-wasm",
+            .root_module = b.createModule(.{
+                .root_source_file = b.path("src/main_gui.zig"),
+                .target = target,
+                .optimize = optimize,
+                .imports = &.{
+                    .{ .name = "solitaire", .module = solitaire_mod },
+                    .{ .name = "raylib", .module = raylib_dep.module("raylib") },
+                    .{ .name = "raygui", .module = raylib_dep.module("raygui") },
+                },
+            }),
+        });
+
+        const install_dir: std.Build.InstallDir = .{ .custom = "web" };
+        const emcc_flags = emsdk.emccDefaultFlags(b.allocator, .{ .optimize = optimize });
+        const emcc_settings = emsdk.emccDefaultSettings(b.allocator, .{ .optimize = optimize });
+
+        const emcc_step = emsdk.emccStep(b, raylib_artifact, wasm, .{
             .optimize = optimize,
+            .flags = emcc_flags,
+            .settings = emcc_settings,
+            .install_dir = install_dir,
+        });
+        b.getInstallStep().dependOn(emcc_step);
 
-            // List of modules available for import in source files part of the
-            // root module.
-            .imports = &.{
-                .{ .name = "solitaire", .module = mod },
-            },
-        }),
-    });
+        const run_step = b.step("run", "Run the app");
+        const html_filename = try std.fmt.allocPrint(b.allocator, "{s}.html", .{wasm.name});
+        const emrun_step = emsdk.emrunStep(
+            b,
+            b.getInstallPath(install_dir, html_filename),
+            &.{},
+        );
+        emrun_step.dependOn(emcc_step);
+        run_step.dependOn(emrun_step);
+    } else {
+        const exe = b.addExecutable(.{
+            .name = "solitaire",
+            .root_module = b.createModule(.{
+                .root_source_file = b.path("src/main_cli.zig"),
+                .target = target,
+                .optimize = optimize,
+                .imports = &.{
+                    .{ .name = "solitaire", .module = solitaire_mod },
+                },
+            }),
+        });
 
-    // // ... link against raylib.
-    // exe.root_module.linkLibrary(raylib_artifact);
-    // exe.root_module.addImport("raylib", raylib);
-    // exe.root_module.addImport("raygui", raygui);
+        b.installArtifact(exe);
 
-    // This declares intent for the executable to be installed into the
-    // install prefix when running `zig build` (i.e. when executing the default
-    // step). By default the install prefix is `zig-out/` but can be overridden
-    // by passing `--prefix` or `-p`.
-    b.installArtifact(exe);
+        const run_cmd = b.addRunArtifact(exe);
+        const run_step = b.step("run", "Run the CLI app");
+        run_step.dependOn(&run_cmd.step);
 
-    // This creates a top level step. Top level steps have a name and can be
-    // invoked by name when running `zig build` (e.g. `zig build run`).
-    // This will evaluate the `run` step rather than the default step.
-    // For a top level step to actually do something, it must depend on other
-    // steps (e.g. a Run step, as we will see in a moment).
-    const run_step = b.step("run", "Run the app");
+        if (b.args) |args| {
+            run_cmd.addArgs(args);
+        }
 
-    // This creates a RunArtifact step in the build graph. A RunArtifact step
-    // invokes an executable compiled by Zig. Steps will only be executed by the
-    // runner if invoked directly by the user (in the case of top level steps)
-    // or if another step depends on it, so it's up to you to define when and
-    // how this Run step will be executed. In our case we want to run it when
-    // the user runs `zig build run`, so we create a dependency link.
-    const run_cmd = b.addRunArtifact(exe);
-    run_step.dependOn(&run_cmd.step);
-
-    // By making the run step depend on the default step, it will be run from the
-    // installation directory rather than directly from within the cache directory.
-    run_cmd.step.dependOn(b.getInstallStep());
-
-    // This allows the user to pass arguments to the application in the build
-    // command itself, like this: `zig build run -- arg1 arg2 etc`
-    if (b.args) |args| {
-        run_cmd.addArgs(args);
+        const test_step = b.step("test", "Run tests");
+        const mod_tests = b.addTest(.{
+            .root_module = solitaire_mod,
+        });
+        const run_mod_tests = b.addRunArtifact(mod_tests);
+        test_step.dependOn(&run_mod_tests.step);
     }
-
-    // Creates an executable that will run `test` blocks from the provided module.
-    // Here `mod` needs to define a target, which is why earlier we made sure to
-    // set the releative field.
-    const mod_tests = b.addTest(.{
-        .root_module = mod,
-    });
-
-    // A run step that will run the test executable.
-    const run_mod_tests = b.addRunArtifact(mod_tests);
-
-    // Creates an executable that will run `test` blocks from the executable's
-    // root module. Note that test executables only test one module at a time,
-    // hence why we have to create two separate ones.
-    const exe_tests = b.addTest(.{
-        .root_module = exe.root_module,
-    });
-
-    // A run step that will run the second test executable.
-    const run_exe_tests = b.addRunArtifact(exe_tests);
-
-    // A top level step for running all tests. dependOn can be called multiple
-    // times and since the two run steps do not depend on one another, this will
-    // make the two of them run in parallel.
-    const test_step = b.step("test", "Run tests");
-    test_step.dependOn(&run_mod_tests.step);
-    test_step.dependOn(&run_exe_tests.step);
-
-    const test_runner = b.addExecutable(.{
-        .name = "test_runner",
-        .root_module = b.createModule(.{
-            .root_source_file = b.path("src/run_tests.zig"),
-            .target = target,
-            .optimize = optimize,
-            .imports = &.{
-                .{ .name = "solitaire", .module = mod },
-            },
-        }),
-    });
-
-    const run_tests_step = b.step("run_tests", "Run custom test runner");
-    const run_test_runner = b.addRunArtifact(test_runner);
-    run_tests_step.dependOn(&run_test_runner.step);
-
-    // Just like flags, top level steps are also listed in the `--help` menu.
-    //
-    // The Zig build system is entirely implemented in userland, which means
-    // that it cannot hook into private compiler APIs. All compilation work
-    // orchestrated by the build system will result in other Zig compiler
-    // subcommands being invoked with the right flags defined. You can observe
-    // these invocations when one fails (or you pass a flag to increase
-    // verbosity) to validate assumptions and diagnose problems.
-    //
-    // Lastly, the Zig build system is relatively simple and self-contained,
-    // and reading its source code will allow you to master it.
 }
