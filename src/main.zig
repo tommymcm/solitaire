@@ -1,16 +1,16 @@
 const std = @import("std");
 const solitaire = @import("solitaire");
 
-pub fn main(init: std.process.Init) !void {
-    const io = init.io;
-    const allocator = init.gpa;
+pub fn main() !void {
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
 
-    var args_it = std.process.Args.Iterator.init(init.minimal.args);
-    // Skip executable name
-    _ = args_it.next();
+    const args = try std.process.argsAlloc(allocator);
+    defer std.process.argsFree(allocator, args);
 
     var use_cli = false;
-    while (args_it.next()) |arg| {
+    for (args[1..]) |arg| {
         if (std.mem.eql(u8, arg, "--cli")) {
             use_cli = true;
         }
@@ -18,16 +18,14 @@ pub fn main(init: std.process.Init) !void {
 
     if (use_cli) {
         var seed: u64 = undefined;
-        io.random(@ptrCast(&seed));
+        try std.posix.getrandom(std.mem.asBytes(&seed));
         var prng = std.Random.DefaultPrng.init(seed);
         const random = prng.random();
 
-        try solitaire.cli.run(io, allocator, random);
+        try solitaire.cli.run(allocator, random);
     } else {
-        var stdout_buf: [128]u8 = undefined;
-        var stdout_writer = std.Io.File.stdout().writer(io, &stdout_buf);
-        const stdout = &stdout_writer.interface;
+        var stdout_wrap = std.fs.File.stdout().writer(&.{});
+        const stdout = &stdout_wrap.interface;
         try stdout.print("GUI mode not yet implemented. Run with --cli to play in terminal.\n", .{});
-        try stdout.flush();
     }
 }

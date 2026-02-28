@@ -211,6 +211,56 @@ test "phase machine transitions" {
     try std.testing.expectEqual(rules.Phase.discard, state.phase);
 
     // playDiscard should move to action
-    try state.playDiscard(&[_]usize{});
+    _ = try state.playDiscard(&[_]usize{});
     try std.testing.expectEqual(rules.Phase.action, state.phase);
-}
+    }
+
+    test "playDelay field update" {
+        const allocator = std.testing.allocator;
+        var prng = std.Random.DefaultPrng.init(42);
+        const random = prng.random();
+
+        var state = try GameState.init(allocator, random);
+        defer state.deinit();
+
+        // Clear field and hand for controlled test
+        for (0..4) |i| {
+            state.field[i] = null;
+            state.hand[i] = null;
+        }
+
+        // Hand: 2, 3 of Hearts
+        state.hand[0] = Card{ .rank = .two, .suit = .hearts };
+        state.hand[1] = Card{ .rank = .three, .suit = .hearts };
+
+        // Field: [0]=4H, [1]=5H, [2]=6H, [3]=7H
+        state.field[0] = Card{ .rank = .four, .suit = .hearts };
+        state.field[1] = Card{ .rank = .five, .suit = .hearts };
+        state.field[2] = Card{ .rank = .six, .suit = .hearts };
+        state.field[3] = Card{ .rank = .seven, .suit = .hearts };
+
+        const enemy_count_before = state.enemy_deck.count();
+
+        // Perform delay action
+        try std.testing.expect(try state.playDelay(.{ 0, 1 }));
+
+        // Verify target (4H) is at the bottom of enemy deck
+        // One card was added to bottom, one card was drawn to refill field.
+        // So net change to enemy deck count should be 0.
+        try std.testing.expectEqual(@as(usize, enemy_count_before), state.enemy_deck.count());
+        try std.testing.expectEqual(Card{ .rank = .four, .suit = .hearts }, state.enemy_deck.cards.items[0]);
+
+        // Verify field state after refill
+        // Slot [0] should now be 5H
+        try std.testing.expect(state.field[0] != null);
+        try std.testing.expectEqual(Card{ .rank = .five, .suit = .hearts }, state.field[0].?);
+        // Slot [1] should now be 6H
+        try std.testing.expect(state.field[1] != null);
+        try std.testing.expectEqual(Card{ .rank = .six, .suit = .hearts }, state.field[1].?);
+        // Slot [2] should now be 7H
+        try std.testing.expect(state.field[2] != null);
+        try std.testing.expectEqual(Card{ .rank = .seven, .suit = .hearts }, state.field[2].?);
+        // Slot [3] should be a new card from enemy deck (not null)
+        try std.testing.expect(state.field[3] != null);
+    }
+

@@ -2,19 +2,18 @@ const std = @import("std");
 const rules = @import("rules.zig");
 const card_mod = @import("card.zig");
 const GameState = rules.GameState;
-const Io = std.Io;
 
-pub fn run(io: Io, allocator: std.mem.Allocator, random: std.Random) !void {
+pub fn run(allocator: std.mem.Allocator, random: std.Random) !void {
     var state = try GameState.init(allocator, random);
     defer state.deinit();
 
     var stdout_buf: [4096]u8 = undefined;
-    var stdout_writer = std.Io.File.stdout().writer(io, &stdout_buf);
-    const stdout = &stdout_writer.interface;
+    var stdout_wrap = std.fs.File.stdout().writer(&stdout_buf);
+    const stdout = &stdout_wrap.interface;
 
     var stdin_buf: [1024]u8 = undefined;
-    var stdin_reader = std.Io.File.stdin().reader(io, &stdin_buf);
-    const stdin = &stdin_reader.interface;
+    var stdin_wrap = std.fs.File.stdin().reader(&stdin_buf);
+    const stdin = &stdin_wrap.interface;
 
     try stdout.print("Welcome to Menagerie!\n", .{});
     try stdout.flush();
@@ -31,16 +30,16 @@ pub fn run(io: Io, allocator: std.mem.Allocator, random: std.Random) !void {
 
             try stdout.print("Field: ", .{});
             for (state.field, 0..) |maybe_card, i| {
-                if (maybe_card) |card| {
-                    try stdout.print("[{}] {f}  ", .{ i + 1, card });
+                if (maybe_card) |c| {
+                    try stdout.print("[{}] {f}  ", .{ i + 1, c });
                 }
             }
             try stdout.print("\n", .{});
 
             try stdout.print("Hand:  ", .{});
             for (state.hand, 0..) |maybe_card, i| {
-                if (maybe_card) |card| {
-                    try stdout.print("[{}] {f}  ", .{ i + 1, card });
+                if (maybe_card) |c| {
+                    try stdout.print("[{}] {f}  ", .{ i + 1, c });
                 } else {
                     try stdout.print("[{}] --  ", .{i + 1});
                 }
@@ -190,7 +189,7 @@ pub fn run(io: Io, allocator: std.mem.Allocator, random: std.Random) !void {
                         } else |_| {}
                     }
                     if (count == 2) {
-                        if (try state.delay(hand_indices)) {
+                        if (try state.playDelay(hand_indices)) {
                             try stdout.print("Cards sacrificed. Target moved to bottom of enemy deck.\n", .{});
                         } else {
                             try stdout.print("Invalid delay.\n", .{});
@@ -213,16 +212,16 @@ pub fn run(io: Io, allocator: std.mem.Allocator, random: std.Random) !void {
             try stdout.print("\n--- Discard Phase ---\n", .{});
             try stdout.print("Field: ", .{});
             for (state.field, 0..) |maybe_card, i| {
-                if (maybe_card) |card| {
-                    try stdout.print("[{}] {f}  ", .{ i + 1, card });
+                if (maybe_card) |c| {
+                    try stdout.print("[{}] {f}  ", .{ i + 1, c });
                 }
             }
             try stdout.print("\n", .{});
 
             try stdout.print("Hand:  ", .{});
             for (state.hand, 0..) |maybe_card, i| {
-                if (maybe_card) |card| {
-                    try stdout.print("[{}] {f}  ", .{ i + 1, card });
+                if (maybe_card) |c| {
+                    try stdout.print("[{}] {f}  ", .{ i + 1, c });
                 } else {
                     try stdout.print("[{}] --  ", .{i + 1});
                 }

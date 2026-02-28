@@ -40,58 +40,6 @@ pub const GameState = struct {
         };
     }
 
-    pub fn marchField(self: *GameState) void {
-        var i: u8 = 0;
-        while (i < 4) : (i += 1) {
-            if (self.field[i] == null) {
-                // Find the next card.
-                var j: u8 = i + 1;
-                while (j < 4) : (j += 1) {
-                    // Move card into the empty forward slot.
-                    if (self.field[j] != null) {
-                        self.field[i] = self.field[j];
-                        self.field[j] = null;
-                        break;
-                    }
-                }
-            }
-        }
-    }
-
-    pub fn sacrifice(self: *GameState, hand_idx: usize) bool {
-        if (hand_idx >= 4) return false;
-        const h_card = self.hand[hand_idx] orelse return false;
-        const f_card = self.field[0] orelse return false;
-
-        if (isFaceCard(h_card) or isFaceCard(f_card)) {
-            self.is_lost = true;
-        }
-
-        self.hand[hand_idx] = null;
-        self.field[0] = null;
-        return true;
-    }
-
-    pub fn delay(self: *GameState, hand_indices: [2]usize) !bool {
-        if (hand_indices[0] >= 4 or hand_indices[1] >= 4) return false;
-        if (hand_indices[0] == hand_indices[1]) return false;
-        const h1 = self.hand[hand_indices[0]] orelse return false;
-        const h2 = self.hand[hand_indices[1]] orelse return false;
-        if (self.field[0] == null) return false;
-
-        if (isFaceCard(h1) or isFaceCard(h2)) {
-            self.is_lost = true;
-        }
-
-        const target = self.field[0].?;
-        self.field[0] = null;
-        try self.enemy_deck.putOnBottom(target);
-
-        self.hand[hand_indices[0]] = null;
-        self.hand[hand_indices[1]] = null;
-        return true;
-    }
-
     pub fn init(allocator: std.mem.Allocator, rng: std.Random) !GameState {
         var player_deck = Deck.init(allocator, rng);
         var enemy_deck = Deck.init(allocator, rng);
@@ -164,6 +112,58 @@ pub const GameState = struct {
         self.deck.deinit();
         self.enemy_deck.deinit();
         self.discard_pile.deinit();
+    }
+
+    pub fn marchField(self: *GameState) void {
+        var i: u8 = 0;
+        while (i < 4) : (i += 1) {
+            if (self.field[i] == null) {
+                // Find the next card.
+                var j: u8 = i + 1;
+                while (j < 4) : (j += 1) {
+                    // Move card into the empty forward slot.
+                    if (self.field[j] != null) {
+                        self.field[i] = self.field[j];
+                        self.field[j] = null;
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    pub fn sacrifice(self: *GameState, hand_idx: usize) bool {
+        if (hand_idx >= 4) return false;
+        const h_card = self.hand[hand_idx] orelse return false;
+        const f_card = self.field[0] orelse return false;
+
+        if (isFaceCard(h_card) or isFaceCard(f_card)) {
+            self.is_lost = true;
+        }
+
+        self.hand[hand_idx] = null;
+        self.field[0] = null;
+        return true;
+    }
+
+    pub fn delay(self: *GameState, hand_indices: [2]usize) !bool {
+        if (hand_indices[0] >= 4 or hand_indices[1] >= 4) return false;
+        if (hand_indices[0] == hand_indices[1]) return false;
+        const h1 = self.hand[hand_indices[0]] orelse return false;
+        const h2 = self.hand[hand_indices[1]] orelse return false;
+        if (self.field[0] == null) return false;
+
+        if (isFaceCard(h1) or isFaceCard(h2)) {
+            self.is_lost = true;
+        }
+
+        const target = self.field[0].?;
+        self.field[0] = null;
+        try self.enemy_deck.putOnBottom(target);
+
+        self.hand[hand_indices[0]] = null;
+        self.hand[hand_indices[1]] = null;
+        return true;
     }
 
     pub fn refillHand(self: *GameState) void {
@@ -365,7 +365,7 @@ pub const GameState = struct {
         }
     }
 
-    fn endActionPhase(self: *GameState) !void {
+    pub fn endActionPhase(self: *GameState) !void {
         try self.drawNextEnemy();
         if (self.isGameOver()) {
             self.phase = .game_over;

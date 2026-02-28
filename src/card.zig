@@ -8,7 +8,7 @@ pub const Suit = enum {
 
     pub fn format(
         self: Suit,
-        w: *std.Io.Writer,
+        writer: anytype,
     ) !void {
         const s = switch (self) {
             .hearts => "♥",
@@ -16,7 +16,7 @@ pub const Suit = enum {
             .clubs => "♣",
             .spades => "♠",
         };
-        try w.writeAll(s);
+        try writer.writeAll(s);
     }
 
     pub fn color(self: Suit) enum { red, black } {
@@ -64,7 +64,7 @@ pub const Rank = enum(u4) {
 
     pub fn format(
         self: Rank,
-        w: *std.Io.Writer,
+        writer: anytype,
     ) !void {
         const s = switch (self) {
             .joker => "Jkr",
@@ -74,11 +74,11 @@ pub const Rank = enum(u4) {
             .king => "K",
             .ten => "10",
             else => |r| {
-                try w.print("{d}", .{@intFromEnum(r)});
+                try writer.print("{d}", .{@intFromEnum(r)});
                 return;
             },
         };
-        try w.writeAll(s);
+        try writer.writeAll(s);
     }
 };
 
@@ -88,19 +88,19 @@ pub const Card = struct {
 
     pub fn format(
         self: Card,
-        w: *std.Io.Writer,
+        writer: anytype,
     ) !void {
         if (self.rank == .joker) {
-            try w.writeAll("Jkr");
+            try writer.writeAll("Jkr");
             return;
         }
-        try self.rank.format(w);
-        try self.suit.format(w);
+        try self.rank.format(writer);
+        try self.suit.format(writer);
     }
 };
 
 pub const Deck = struct {
-    cards: std.ArrayList(Card),
+    cards: std.ArrayListUnmanaged(Card),
     rng: std.Random,
     allocator: std.mem.Allocator,
 
