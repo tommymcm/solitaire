@@ -9,16 +9,16 @@ const GameState = rules.GameState;
 const SCREEN_WIDTH = 800;
 const SCREEN_HEIGHT = 450;
 
+// Global state pointer for Emscripten callback to access.
+var global_state: ?*GameState = null;
+var native_gpa = std.heap.GeneralPurposeAllocator(.{}){};
+
 pub fn main() !void {
     // Memory allocator.
     const allocator = if (builtin.os.tag == .emscripten)
         std.heap.wasm_allocator
-    else l: {
-        var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-        // Note: in a real app you'd want to handle deinit, 
-        // but for this scaffold we'll keep it simple.
-        break :l gpa.allocator();
-    };
+    else 
+        native_gpa.allocator();
 
     // Pseudo-random value generator.
     var seed: u64 = undefined;
@@ -27,36 +27,40 @@ pub fn main() !void {
     const random = prng.random();
 
     // Initialize raylib.
-    rl.initWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "raylib-zig [core] example - basic window");
-    defer rl.closeWindow(); // Close window and OpenGL context
+    rl.initWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Card Capture - GUI");
 
-    rl.setTargetFPS(60);
-
-    // Initialize game.
+    // Initialize game state.
     var state = try GameState.init(allocator, random);
-    defer state.deinit();
+    global_state = &state;
 
     if (builtin.os.tag == .emscripten) {
-        emscripten.emscripten_set_main_loop(@ptrCast(&updateDrawFrame), 0, 1);
+        // Emscripten loop:
+        // simulate_infinite_loop = 1 stops execution of main here via exception.
+        emscripten.emscripten_set_main_loop(updateDrawFrame, 0, 1);
     } else {
-        rl.setTargetFPS(60); // Set our game to run at 60 frames-per-second
+        // Native loop:
+        defer rl.closeWindow();
+        defer state.deinit();
+        defer _ = native_gpa.deinit();
 
-        // Main game loop
-        while (!rl.windowShouldClose()) { // Detect window close button or ESC key
+        rl.setTargetFPS(60);
+
+        while (!rl.windowShouldClose()) {
             updateDrawFrame();
         }
     }
 }
 
-fn updateDrawFrame() void {
+export fn updateDrawFrame() void {
     // Update
-    // TODO: Update your variables here
+    // if (global_state) |state| { _ = state; }
 
     // Draw
     rl.beginDrawing();
     defer rl.endDrawing();
 
-    rl.clearBackground(.white);
+    rl.clearBackground(.ray_white);
 
-    rl.drawText("Congrats! You created your first window!", 190, 200, 20, .light_gray);
+    rl.drawText("Card Capture GUI", 190, 200, 20, .dark_gray);
+    rl.drawText("Window should now stay open!", 190, 230, 20, .light_gray);
 }
