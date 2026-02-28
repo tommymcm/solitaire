@@ -207,6 +207,14 @@ pub fn main(init: std.process.Init) !void {
 
         // Discard Phase
         try stdout.print("\n--- Discard Phase ---\n", .{});
+        try stdout.print("Field: ", .{});
+        for (state.field, 0..) |maybe_card, i| {
+            if (maybe_card) |card| {
+                try stdout.print("[{}] {f}  ", .{ i + 1, card });
+            }
+        }
+        try stdout.print("\n", .{});
+
         try stdout.print("Hand:  ", .{});
         for (state.hand, 0..) |maybe_card, i| {
             if (maybe_card) |card| {
