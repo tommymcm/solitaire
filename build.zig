@@ -83,5 +83,21 @@ pub fn build(b: *std.Build) !void {
         });
         const run_mod_tests = b.addRunArtifact(mod_tests);
         test_step.dependOn(&run_mod_tests.step);
+
+        const test_runner = b.addExecutable(.{
+            .name = "test_runner",
+            .root_module = b.createModule(.{
+                .root_source_file = b.path("src/run_tests.zig"),
+                .target = target,
+                .optimize = optimize,
+                .imports = &.{
+                    .{ .name = "solitaire", .module = solitaire_mod },
+                },
+            }),
+        });
+
+        const run_tests_step = b.step("run_tests", "Run custom test runner");
+        const run_test_runner = b.addRunArtifact(test_runner);
+        run_tests_step.dependOn(&run_test_runner.step);
     }
 }
