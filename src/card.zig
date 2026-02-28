@@ -11,10 +11,10 @@ pub const Suit = enum {
         w: *std.Io.Writer,
     ) !void {
         const s = switch (self) {
-            .hearts => "H",
-            .diamonds => "D",
-            .clubs => "C",
-            .spades => "S",
+            .hearts => "♥",
+            .diamonds => "♦",
+            .clubs => "♣",
+            .spades => "♠",
         };
         try w.writeAll(s);
     }
@@ -42,6 +42,25 @@ pub const Rank = enum(u4) {
     jack,
     queen,
     king,
+
+    pub fn value(self: Rank) u8 {
+        return switch (self) {
+            .joker => 0,
+            .ace => 14,
+            .two => 2,
+            .three => 3,
+            .four => 4,
+            .five => 5,
+            .six => 6,
+            .seven => 7,
+            .eight => 8,
+            .nine => 9,
+            .ten => 10,
+            .jack => 11,
+            .queen => 12,
+            .king => 13,
+        };
+    }
 
     pub fn format(
         self: Rank,
