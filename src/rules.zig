@@ -19,6 +19,13 @@ pub const GameState = struct {
     allocator: std.mem.Allocator,
     is_lost: bool = false,
 
+    pub fn emptyHand(self: GameState) bool {
+        for (self.hand) |maybe_card| {
+            if (maybe_card != null) return false;
+        }
+        return true;
+    }
+
     fn isFaceCard(c: Card) bool {
         return switch (c.rank) {
             .ace, .jack, .queen, .king => true,
@@ -26,17 +33,17 @@ pub const GameState = struct {
         };
     }
 
-    pub fn marchField(state: *GameState) void {
+    pub fn marchField(self: *GameState) void {
         var i: u8 = 0;
         while (i < 4) : (i += 1) {
-            if (state.field[i] == null) {
+            if (self.field[i] == null) {
                 // Find the next card.
                 var j: u8 = i + 1;
                 while (j < 4) : (j += 1) {
                     // Move card into the empty forward slot.
-                    if (state.field[j] != null) {
-                        state.field[i] = state.field[j];
-                        state.field[j] = null;
+                    if (self.field[j] != null) {
+                        self.field[i] = self.field[j];
+                        self.field[j] = null;
                         break;
                     }
                 }
@@ -48,7 +55,7 @@ pub const GameState = struct {
         if (hand_idx >= 4) return false;
         const h_card = self.hand[hand_idx] orelse return false;
         const f_card = self.field[0] orelse return false;
-        
+
         if (isFaceCard(h_card) or isFaceCard(f_card)) {
             self.is_lost = true;
         }
@@ -64,7 +71,7 @@ pub const GameState = struct {
         const h1 = self.hand[hand_indices[0]] orelse return false;
         const h2 = self.hand[hand_indices[1]] orelse return false;
         if (self.field[0] == null) return false;
-        
+
         if (isFaceCard(h1) or isFaceCard(h2)) {
             self.is_lost = true;
         }
@@ -72,7 +79,7 @@ pub const GameState = struct {
         const target = self.field[0].?;
         self.field[0] = null;
         try self.enemy_deck.putOnBottom(target);
-        
+
         self.hand[hand_indices[0]] = null;
         self.hand[hand_indices[1]] = null;
         return true;
@@ -106,6 +113,7 @@ pub const GameState = struct {
         try player_deck.cards.append(allocator, .{ .suit = .spades, .rank = .joker });
 
         enemy_deck.shuffle();
+        player_deck.shuffle();
 
         var state = GameState{
             .deck = player_deck,
