@@ -186,3 +186,31 @@ test "delay logic" {
     try std.testing.expect(state.hand[1] == null);
     try std.testing.expectEqual(count_before + 1, state.enemy_deck.count());
 }
+
+test "phase machine transitions" {
+    const allocator = std.testing.allocator;
+    var prng = std.Random.DefaultPrng.init(42);
+    const random = prng.random();
+    
+    var state = try GameState.init(allocator, random);
+    defer state.deinit();
+
+    try std.testing.expectEqual(rules.Phase.action, state.phase);
+
+    // Setup for a capture
+    for (0..4) |i| {
+        state.hand[i] = null;
+        state.field[i] = null;
+    }
+    state.hand[0] = Card{ .rank = .ace, .suit = .hearts };
+    state.field[0] = Card{ .rank = .two, .suit = .hearts };
+
+    const hand_indices = [_]usize{ 0 };
+    _ = try state.playCapture(&hand_indices, 0, null);
+
+    try std.testing.expectEqual(rules.Phase.discard, state.phase);
+
+    // playDiscard should move to action
+    try state.playDiscard(&[_]usize{});
+    try std.testing.expectEqual(rules.Phase.action, state.phase);
+}

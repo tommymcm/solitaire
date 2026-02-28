@@ -9,6 +9,12 @@ const Deck = card_mod.Deck;
 // must sacrifice card(s). But watch out! If the enemy ever takes a face card,
 // you lose!
 
+pub const Phase = enum {
+    action,
+    discard,
+    game_over,
+};
+
 pub const GameState = struct {
     deck: Deck, // Player's deck
     enemy_deck: Deck,
@@ -18,6 +24,7 @@ pub const GameState = struct {
     captured_count: u32,
     allocator: std.mem.Allocator,
     is_lost: bool = false,
+    phase: Phase = .action,
 
     pub fn emptyHand(self: GameState) bool {
         for (self.hand) |maybe_card| {
@@ -318,6 +325,53 @@ pub const GameState = struct {
 
         // Draw a new card to the field.
         self.field[3] = self.enemy_deck.draw();
+    }
+
+    pub fn playCapture(self: *GameState, hand_indices: []const usize, field_idx: usize, joker_mimic: ?Card) !bool {
+        if (self.phase != .action) return false;
+        if (try self.applyCapture(hand_indices, field_idx, joker_mimic)) {
+            try self.endActionPhase();
+            return true;
+        }
+        return false;
+    }
+
+    pub fn playSacrifice(self: *GameState, hand_idx: usize) bool {
+        if (self.phase != .action) return false;
+        if (self.sacrifice(hand_idx)) {
+            self.endActionPhase() catch {};
+            return true;
+        }
+        return false;
+    }
+
+    pub fn playDelay(self: *GameState, hand_indices: [2]usize) !bool {
+        if (self.phase != .action) return false;
+        if (try self.delay(hand_indices)) {
+            try self.endActionPhase();
+            return true;
+        }
+        return false;
+    }
+
+    pub fn playDiscard(self: *GameState, indices: []const usize) !void {
+        if (self.phase != .discard) return;
+        try self.discardFromHand(indices);
+        self.refillHand();
+        if (self.isGameOver()) {
+            self.phase = .game_over;
+        } else {
+            self.phase = .action;
+        }
+    }
+
+    fn endActionPhase(self: *GameState) !void {
+        try self.drawNextEnemy();
+        if (self.isGameOver()) {
+            self.phase = .game_over;
+        } else {
+            self.phase = .discard;
+        }
     }
 
     pub fn isGameOver(self: GameState) bool {
