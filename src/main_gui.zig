@@ -12,7 +12,7 @@ const SCREEN_HEIGHT = 400;
 
 const CARD_W = 80;
 const CARD_H = 110;
-const CARD_SPACING = 15;
+const CARD_SPACING = 10;
 
 const SHEET_COLS = 14;
 const SHEET_ROWS = 4;
@@ -20,13 +20,15 @@ const SHEET_ROWS = 4;
 const ANIM_SPEED = 10.0;
 
 // Layout Constants
-const MARGIN_X = 15;
-const MARGIN_Y = 60; // Top margin for decks and cards
+const MARGIN_X = 25;
+const MARGIN_Y = 25; // Top margin for decks and cards
+const PAD_X = 2 * CARD_SPACING;
+const PAD_Y = 40;
 
-const FIELD_X = 110;
+const FIELD_X = MARGIN_X + CARD_W + PAD_X;
 const FIELD_Y = MARGIN_Y;
-const HAND_X = 110;
-const HAND_Y = 210;
+const HAND_X = FIELD_X;
+const HAND_Y = FIELD_Y + CARD_H + PAD_Y;
 
 const ENEMY_DECK_POS = rl.Vector2{ .x = MARGIN_X, .y = FIELD_Y };
 const PLAYER_DECK_POS = rl.Vector2{ .x = MARGIN_X, .y = HAND_Y };
@@ -37,10 +39,10 @@ const REMOVED_POS = rl.Vector2{ .x = SCREEN_WIDTH - CARD_W - MARGIN_X, .y = FIEL
 const BTN_W = 100;
 const BTN_H = 30;
 const BTN_SPACING = 20;
-const BTN_ROW_Y = 360;
+const BTN_ROW_Y = HAND_Y + CARD_H + 30;
 
 const HELP_BTN_W = 80;
-const HELP_BTN_X = SCREEN_WIDTH - HELP_BTN_W - 10;
+const HELP_BTN_X = SCREEN_WIDTH - HELP_BTN_W - MARGIN_X;
 
 const SACRIFICE_BTN_X = (SCREEN_WIDTH - (BTN_W * 2 + BTN_SPACING)) / 2;
 const DELAY_BTN_X = SACRIFICE_BTN_X + BTN_W + BTN_SPACING;
