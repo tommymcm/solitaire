@@ -211,6 +211,8 @@ pub fn main() !void {
     prng_instance = std.Random.DefaultPrng.init(seed);
 
     card_texture = try rl.loadTexture("assets/cards.png");
+    rl.setTextureFilter(card_texture, .point);
+
     game_font = try rl.loadFont("assets/fonts/m6x11.ttf");
 
     try restartGame();
