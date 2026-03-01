@@ -363,6 +363,25 @@ fn processInput() void {
 
         // 0. Tutorial Input
         if (tutorial_active) {
+            // Keyboard Navigation
+            if (rl.isKeyPressed(.right)) {
+                current_step += 1;
+                if (current_step >= tutorial_steps.len) {
+                    tutorial_active = false;
+                    current_step = 0;
+                }
+                return;
+            }
+            if (current_step > 0 and rl.isKeyPressed(.left)) {
+                current_step -= 1;
+                return;
+            }
+            if (rl.isKeyPressed(.escape)) {
+                tutorial_active = false;
+                current_step = 0;
+                return;
+            }
+
             const step = tutorial_steps[current_step];
             const box_y = getTutBoxY(step.box_pos);
 
