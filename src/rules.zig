@@ -3,8 +3,8 @@ const card_mod = @import("card.zig");
 const Card = card_mod.Card;
 const Deck = card_mod.Deck;
 
-// Game rules for "Menagerie", a.k.a "Card Capture".
-// Menagerie is a deck-building solitaire game where the player 'purchases'
+// Game rules for "Card Capture".
+// Card Capture is a deck-building solitaire game where the player 'purchases'
 // cards from the enemy queue. If they aren't able to purchase a card, they
 // must sacrifice card(s). But watch out! If the enemy ever takes a face card,
 // you lose!

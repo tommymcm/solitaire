@@ -20,7 +20,7 @@ pub fn build(b: *std.Build) !void {
         const raylib_artifact = raylib_dep.artifact("raylib");
 
         const wasm = b.addLibrary(.{
-            .name = "menagerie",
+            .name = "card-capture",
             .root_module = b.createModule(.{
                 .root_source_file = b.path("src/main_gui.zig"),
                 .target = target,
@@ -36,9 +36,8 @@ pub fn build(b: *std.Build) !void {
         const install_dir: std.Build.InstallDir = .{ .custom = "web" };
 
         var emcc_flags = emsdk.emccDefaultFlags(b.allocator, .{ .optimize = optimize });
-        // Use separate keys for flag and value
-        try emcc_flags.put("--preload-file", {});
-        try emcc_flags.put("assets", {});
+        try emcc_flags.put("--preload-file assets", {});
+        try emcc_flags.put("--shell-file web/shell.html", {});
 
         var emcc_settings = emsdk.emccDefaultSettings(b.allocator, .{ .optimize = optimize });
         try emcc_settings.put("ALLOW_MEMORY_GROWTH", "1");
@@ -62,7 +61,7 @@ pub fn build(b: *std.Build) !void {
         run_step.dependOn(emrun_step);
     } else {
         const exe = b.addExecutable(.{
-            .name = "solitaire",
+            .name = "card-capture",
             .root_module = b.createModule(.{
                 .root_source_file = b.path("src/main_cli.zig"),
                 .target = target,

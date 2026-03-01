@@ -24,7 +24,7 @@ pub fn main() !void {
     var stdin_wrap = std.fs.File.stdin().reader(&stdin_buf);
     const stdin = &stdin_wrap.interface;
 
-    try stdout.print("Welcome to Menagerie!\n", .{});
+    try stdout.print("Welcome to Card Capture!\n", .{});
     try stdout.flush();
 
     while (state.phase != .game_over) {
