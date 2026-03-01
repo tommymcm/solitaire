@@ -184,6 +184,7 @@ fn syncVisuals(action: ActionType) void {
                 }
             }
             if (!found_prev) {
+                // New card from player deck
                 hand_visuals[i] = VisualCard{ .card = card, .pos = PLAYER_DECK_POS, .target_pos = target, .active = true };
             }
         } else {
@@ -218,6 +219,7 @@ fn syncVisuals(action: ActionType) void {
                 }
             }
             if (!found_prev) {
+                // New card from enemy deck
                 field_visuals[i] = VisualCard{ .card = card, .pos = ENEMY_DECK_POS, .target_pos = target, .active = true };
             }
         } else {
@@ -245,8 +247,8 @@ fn processInput() void {
         const mouse = rl.getMousePosition();
 
         if (global_state.phase == .game_over) {
-            // PLAY AGAIN button at x=340
-            if (rl.checkCollisionPointRec(mouse, .{ .x = 340, .y = 300, .width = 120, .height = 40 })) {
+            // PLAY AGAIN button at x=350, width=100
+            if (rl.checkCollisionPointRec(mouse, .{ .x = 350, .y = 300, .width = 100, .height = 30 })) {
                 restartGame() catch {};
             }
             return;
@@ -293,19 +295,19 @@ fn processInput() void {
             }
         }
 
-        // 3. Action Buttons (Bottom Centered)
+        // 3. Action Buttons (Bottom Centered) - 100x30
         if (global_state.phase == .action) {
-            // SACRIFICE at x=270
-            if (rl.checkCollisionPointRec(mouse, .{ .x = 270, .y = 410, .width = 120, .height = 40 })) {
+            // SACRIFICE at x=290
+            if (rl.checkCollisionPointRec(mouse, .{ .x = 290, .y = 410, .width = 100, .height = 30 })) {
                 handleSacrifice();
             }
             // DELAY at x=410
-            if (rl.checkCollisionPointRec(mouse, .{ .x = 410, .y = 410, .width = 120, .height = 40 })) {
+            if (rl.checkCollisionPointRec(mouse, .{ .x = 410, .y = 410, .width = 100, .height = 30 })) {
                 handleDelay();
             }
         } else if (global_state.phase == .discard) {
-            // CONFIRM DISCARD at x=340
-            if (rl.checkCollisionPointRec(mouse, .{ .x = 340, .y = 410, .width = 120, .height = 40 })) {
+            // CONFIRM DISCARD at x=350
+            if (rl.checkCollisionPointRec(mouse, .{ .x = 350, .y = 410, .width = 100, .height = 30 })) {
                 handleDiscard();
             }
         }
@@ -448,17 +450,17 @@ export fn updateDrawFrame() void {
 
     // UI
     if (global_state.phase == .action) {
-        drawButton(270, 410, 120, 40, "SACRIFICE", .orange);
-        drawButton(410, 410, 120, 40, "DELAY", .dark_blue);
+        drawButton(290, 410, 100, 30, "SACRIFICE", .orange);
+        drawButton(410, 410, 100, 30, "DELAY", .dark_blue);
     } else if (global_state.phase == .discard) {
-        drawButton(340, 410, 120, 40, "CONFIRM DISCARD", .dark_gray);
+        drawButton(350, 410, 100, 30, "CONFIRM", .dark_gray);
     } else if (global_state.phase == .game_over) {
         const msg = if (global_state.is_won) "VICTORY!" else "DEFEAT";
         const col = if (global_state.is_won) rl.Color.gold else rl.Color.red;
         const tw = rl.measureText(msg, 40);
         rl.drawText(msg, @divTrunc(SCREEN_WIDTH - tw, 2), 200, 40, col);
         
-        drawButton(340, 300, 120, 40, "PLAY AGAIN", .dark_gray);
+        drawButton(350, 300, 100, 30, "PLAY AGAIN", .dark_gray);
     }
 
     // Status message at the top
@@ -480,7 +482,8 @@ fn drawButton(x: i32, y: i32, w: i32, h: i32, text: [:0]const u8, color: rl.Colo
     const rect = rl.Rectangle{ .x = @floatFromInt(x), .y = @floatFromInt(y), .width = @floatFromInt(w), .height = @floatFromInt(h) };
     rl.drawRectangleRec(rect, color);
     rl.drawRectangleLinesEx(rect, 2, .ray_white);
-    rl.drawText(text, x + @divTrunc(w - rl.measureText(text, 10), 2), y + 15, 10, .ray_white);
+    const tw = rl.measureText(text, 10);
+    rl.drawText(text, x + @divTrunc(w - tw, 2), y + 10, 10, .ray_white);
 }
 
 fn drawSlot(x: i32, y: i32) void { rl.drawRectangleLines(x, y, CARD_W, CARD_H, .gray); }
