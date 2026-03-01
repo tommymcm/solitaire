@@ -35,10 +35,7 @@ pub fn build(b: *std.Build) !void {
 
         const install_dir: std.Build.InstallDir = .{ .custom = "web" };
 
-        var emcc_flags = emsdk.emccDefaultFlags(b.allocator, .{ .optimize = optimize });
-        try emcc_flags.put("--preload-file assets", {});
-        try emcc_flags.put("--shell-file web/shell.html", {});
-
+        const emcc_flags = emsdk.emccDefaultFlags(b.allocator, .{ .optimize = optimize });
         var emcc_settings = emsdk.emccDefaultSettings(b.allocator, .{ .optimize = optimize });
         try emcc_settings.put("ALLOW_MEMORY_GROWTH", "1");
 
@@ -47,6 +44,10 @@ pub fn build(b: *std.Build) !void {
             .flags = emcc_flags,
             .settings = emcc_settings,
             .install_dir = install_dir,
+            .shell_file_path = b.path("web/shell.html"),
+            .embed_paths = &.{
+                .{ .src_path = "assets/", .virtual_path = "assets/" },
+            },
         });
         b.getInstallStep().dependOn(emcc_step);
 
