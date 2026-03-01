@@ -177,70 +177,39 @@ pub const GameState = struct {
         }
     }
 
-    pub fn canCapture(self: GameState, hand_indices: []const usize, field_idx: usize, joker_mimic: ?card_mod.Card) bool {
+    /// Checks if the selected hand cards can capture the target field card.
+    pub fn canCapture(self: GameState, hand_indices: []const usize, field_idx: usize, _: ?card_mod.Card) bool {
         if (field_idx >= 4) return false;
         const target = self.field[field_idx] orelse return false;
         if (hand_indices.len == 0) return false;
 
-        var common_suit: ?card_mod.Suit = null;
-        var has_suited_card = false;
-
-        for (hand_indices) |idx| {
-            const h_card = self.hand[idx] orelse return false;
-            if (h_card.rank != .joker) {
-                has_suited_card = true;
-                if (common_suit == null) {
-                    common_suit = h_card.suit;
-                } else if (common_suit != h_card.suit) {
-                    return false;
+        // Auto-mimic logic: Find the highest value card of the target's suit in hand
+        var max_suit_val: u8 = 0;
+        for (self.hand) |maybe_card| {
+            if (maybe_card) |c| {
+                if (c.suit == target.suit and c.rank != .joker) {
+                    const v = c.rank.value();
+                    if (v > max_suit_val) max_suit_val = v;
                 }
             }
-        }
-
-        var effective_mimic = joker_mimic;
-        if (has_suited_card) {
-            const suit = common_suit.?;
-            var max_val: u8 = 0;
-            var best_card: ?card_mod.Card = null;
-            for (self.hand) |maybe_card| {
-                if (maybe_card) |c| {
-                    if (c.suit == suit and c.rank != .joker) {
-                        const v = c.rank.value();
-                        if (v > max_val) {
-                            max_val = v;
-                            best_card = c;
-                        }
-                    }
-                }
-            }
-            effective_mimic = best_card;
         }
 
         var total_value: u32 = 0;
-        var final_suit: ?card_mod.Suit = null;
-
         for (hand_indices) |idx| {
             const h_card = self.hand[idx] orelse return false;
-            var effective_card = h_card;
             if (h_card.rank == .joker) {
-                if (effective_mimic) |m| {
-                    effective_card = m;
-                } else {
-                    return false;
-                }
+                if (max_suit_val == 0) return false; // Joker needs a card to mimic
+                total_value += max_suit_val;
+            } else {
+                if (h_card.suit != target.suit) return false; // Selection must match target suit
+                total_value += h_card.rank.value();
             }
-            if (final_suit == null) {
-                final_suit = effective_card.suit;
-            } else if (final_suit != effective_card.suit) {
-                return false;
-            }
-            total_value += effective_card.rank.value();
         }
 
-        if (final_suit != target.suit) return false;
         return total_value >= target.rank.value();
     }
 
+    /// Applies the capture if valid.
     pub fn applyCapture(self: *GameState, hand_indices: []const usize, field_idx: usize, joker_mimic: ?card_mod.Card) !bool {
         if (!self.canCapture(hand_indices, field_idx, joker_mimic)) return false;
 
@@ -269,8 +238,12 @@ pub const GameState = struct {
         }
     }
 
+    /// Refills the field from the enemy deck.
     pub fn drawNextEnemy(self: *GameState) !void {
+        // March existing field forward.
         self.marchField();
+
+        // Draw a new card to the field.
         self.field[3] = self.enemy_deck.draw();
     }
 
