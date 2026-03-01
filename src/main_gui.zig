@@ -96,7 +96,7 @@ pub fn main() !void {
     global_state = try GameState.init(allocator, random);
     syncVisuals(.none);
     is_initialized = true;
-    _ = std.fmt.bufPrintZ(&status_message, "Welcome! Select hand cards then click a field card to capture.", .{}) catch unreachable;
+    _ = std.fmt.bufPrintZ(&status_message, "Select hand cards then click a field card to capture.", .{}) catch unreachable;
 
     if (builtin.os.tag == .emscripten) {
         rl.setTargetFPS(60);
@@ -222,6 +222,7 @@ fn processInput() void {
     if (rl.isMouseButtonPressed(.left)) {
         const mouse = rl.getMousePosition();
 
+        // 1. Hand Clicks (Selection)
         for (0..4) |i| {
             const x = @as(f32, @floatFromInt(HAND_X + @as(i32, @intCast(i)) * (CARD_W + SPACING)));
             const rect = rl.Rectangle{ .x = x, .y = HAND_Y, .width = CARD_W, .height = CARD_H };
@@ -232,6 +233,7 @@ fn processInput() void {
             }
         }
 
+        // 2. Field Clicks (Auto-Capture or Selection)
         for (0..4) |i| {
             const x = @as(f32, @floatFromInt(FIELD_X + @as(i32, @intCast(3 - i)) * (CARD_W + SPACING)));
             const rect = rl.Rectangle{ .x = x, .y = FIELD_Y, .width = CARD_W, .height = CARD_H };
@@ -261,15 +263,19 @@ fn processInput() void {
             }
         }
 
+        // 3. Action Buttons (Bottom Centered)
         if (global_state.phase == .action) {
-            if (rl.checkCollisionPointRec(mouse, .{ .x = 650, .y = 100, .width = 120, .height = 40 })) {
+            // SACRIFICE at x=270
+            if (rl.checkCollisionPointRec(mouse, .{ .x = 270, .y = 410, .width = 120, .height = 40 })) {
                 handleSacrifice();
             }
-            if (rl.checkCollisionPointRec(mouse, .{ .x = 650, .y = 150, .width = 120, .height = 40 })) {
+            // DELAY at x=410
+            if (rl.checkCollisionPointRec(mouse, .{ .x = 410, .y = 410, .width = 120, .height = 40 })) {
                 handleDelay();
             }
         } else if (global_state.phase == .discard) {
-            if (rl.checkCollisionPointRec(mouse, .{ .x = 650, .y = 50, .width = 120, .height = 40 })) {
+            // CONFIRM DISCARD at x=340
+            if (rl.checkCollisionPointRec(mouse, .{ .x = 340, .y = 410, .width = 120, .height = 40 })) {
                 handleDiscard();
             }
         }
@@ -337,6 +343,7 @@ export fn updateDrawFrame() void {
     const dt = rl.getFrameTime();
     processInput();
 
+    // Update animations
     for (&field_visuals) |*maybe_v| if (maybe_v.*) |*v| v.lerp(dt);
     for (&hand_visuals) |*maybe_v| if (maybe_v.*) |*v| v.lerp(dt);
     for (&flying_visuals) |*maybe_v| {
@@ -356,9 +363,11 @@ export fn updateDrawFrame() void {
         return;
     }
 
+    // Slots
     for (0..4) |i| drawSlot(@as(i32, @intFromFloat(FIELD_X)) + @as(i32, @intCast(3 - i)) * (CARD_W + SPACING), @as(i32, @intFromFloat(FIELD_Y)));
     for (0..4) |i| drawSlot(@as(i32, @intFromFloat(HAND_X)) + @as(i32, @intCast(i)) * (CARD_W + SPACING), @as(i32, @intFromFloat(HAND_Y)));
 
+    // Cards
     for (field_visuals, 0..) |maybe_v, i| if (maybe_v) |v| {
         drawCard(card_texture, @as(i32, @intFromFloat(v.pos.x)), @as(i32, @intFromFloat(v.pos.y)), v.card);
         if (selected_field == i) rl.drawRectangleLinesEx(.{ .x = v.pos.x, .y = v.pos.y, .width = CARD_W, .height = CARD_H }, 3, .yellow);
@@ -369,6 +378,7 @@ export fn updateDrawFrame() void {
     };
     for (flying_visuals) |maybe_v| if (maybe_v) |v| drawCard(card_texture, @as(i32, @intFromFloat(v.pos.x)), @as(i32, @intFromFloat(v.pos.y)), v.card);
 
+    // Decks & Piles
     if (global_state.enemy_deck.count() > 0) {
         drawCardBack(card_texture, @as(i32, @intFromFloat(ENEMY_DECK_POS.x)), @as(i32, @intFromFloat(ENEMY_DECK_POS.y)));
         var count_buf: [16]u8 = undefined;
@@ -406,13 +416,20 @@ export fn updateDrawFrame() void {
     }
     rl.drawText("Removed", @as(i32, @intFromFloat(REMOVED_POS.x)), @as(i32, @intFromFloat(REMOVED_POS.y)) + CARD_H + 5, 10, .light_gray);
 
+    // UI
     if (global_state.phase == .action) {
-        drawButton(650, 100, 120, 40, "SACRIFICE", .orange);
-        drawButton(650, 150, 120, 40, "DELAY", .dark_blue);
-    } else if (global_state.phase == .discard) drawButton(650, 50, 120, 40, "CONFIRM DISCARD", .dark_gray)
-    else if (global_state.phase == .game_over) rl.drawText("GAME OVER", 300, 200, 40, .red);
+        drawButton(270, 410, 120, 40, "SACRIFICE", .orange);
+        drawButton(410, 410, 120, 40, "DELAY", .dark_blue);
+    } else if (global_state.phase == .discard) {
+        drawButton(340, 410, 120, 40, "CONFIRM DISCARD", .dark_gray);
+    } else if (global_state.phase == .game_over) {
+        rl.drawText("GAME OVER", 300, 200, 40, .red);
+    }
 
-    rl.drawText(&status_message, 210, 420, 20, .ray_white);
+    // Status message at the top
+    const sw = rl.measureText(&status_message, 20);
+    rl.drawText(&status_message, @divTrunc(SCREEN_WIDTH - sw, 2), 20, 20, .ray_white);
+    
     var buf: [64]u8 = undefined;
     rl.drawText(std.fmt.bufPrintZ(&buf, "Score: {d}", .{global_state.captured_count}) catch "Score: ERROR", 10, 420, 20, .ray_white);
     rl.drawText(switch (global_state.phase) { .action => "Phase: ACTION", .discard => "Phase: DISCARD", .game_over => "Phase: GAME OVER" }, 10, 150, 20, .gold);
