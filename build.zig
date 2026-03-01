@@ -34,14 +34,11 @@ pub fn build(b: *std.Build) !void {
         });
 
         const install_dir: std.Build.InstallDir = .{ .custom = "web" };
-        
-        // Add --preload-file assets and --shell-file to emcc flags
+
         var emcc_flags = emsdk.emccDefaultFlags(b.allocator, .{ .optimize = optimize });
-        
-        // Use a single string for flags that need values to keep them together during HashMap iteration
-        // This is a common workaround for unordered maps in some build wrappers
-        try emcc_flags.put("--preload-file assets", {});
-        try emcc_flags.put("--shell-file web/shell.html", {});
+        // Use separate keys for flag and value
+        try emcc_flags.put("--preload-file", {});
+        try emcc_flags.put("assets", {});
 
         var emcc_settings = emsdk.emccDefaultSettings(b.allocator, .{ .optimize = optimize });
         try emcc_settings.put("ALLOW_MEMORY_GROWTH", "1");
