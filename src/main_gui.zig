@@ -583,19 +583,20 @@ export fn updateDrawFrame() void {
     for (flying_visuals) |maybe_v| if (maybe_v) |v| drawCard(card_texture, @as(i32, @intFromFloat(v.pos.x)), @as(i32, @intFromFloat(v.pos.y)), v.card);
 
     // Decks & Piles
+    const label_size = 14;
     if (global_state.enemy_deck.count() > 0) {
         drawCardBack(card_texture, @as(i32, @intFromFloat(ENEMY_DECK_POS.x)), @as(i32, @intFromFloat(ENEMY_DECK_POS.y)));
     } else drawSlot(@as(i32, @intFromFloat(ENEMY_DECK_POS.x)), @as(i32, @intFromFloat(ENEMY_DECK_POS.y)));
     var enemy_label_buf: [32]u8 = undefined;
     const enemy_label = std.fmt.bufPrintZ(&enemy_label_buf, "Enemy: {d}", .{global_state.enemy_deck.count()}) catch "Enemy";
-    rl.drawTextEx(game_font, enemy_label, .{ .x = ENEMY_DECK_POS.x, .y = ENEMY_DECK_POS.y + CARD_H + 5 }, 16, 1, .light_gray);
+    rl.drawTextEx(game_font, enemy_label, .{ .x = ENEMY_DECK_POS.x, .y = ENEMY_DECK_POS.y + CARD_H + label_size / 2 }, label_size, 1, .light_gray);
 
     if (global_state.deck.count() > 0) {
         drawCardBack(card_texture, @as(i32, @intFromFloat(PLAYER_DECK_POS.x)), @as(i32, @intFromFloat(PLAYER_DECK_POS.y)));
     } else drawSlot(@as(i32, @intFromFloat(PLAYER_DECK_POS.x)), @as(i32, @intFromFloat(PLAYER_DECK_POS.y)));
     var player_label_buf: [32]u8 = undefined;
     const player_label = std.fmt.bufPrintZ(&player_label_buf, "Deck: {d}", .{global_state.deck.count()}) catch "Deck";
-    rl.drawTextEx(game_font, player_label, .{ .x = PLAYER_DECK_POS.x, .y = PLAYER_DECK_POS.y + CARD_H + 5 }, 16, 1, .light_gray);
+    rl.drawTextEx(game_font, player_label, .{ .x = PLAYER_DECK_POS.x, .y = PLAYER_DECK_POS.y + CARD_H + label_size / 2 }, label_size, 1, .light_gray);
 
     if (global_state.discard_pile.count() > 0) {
         const top = global_state.discard_pile.cards[global_state.discard_pile.len - 1];
@@ -603,10 +604,10 @@ export fn updateDrawFrame() void {
     } else drawSlot(@as(i32, @intFromFloat(DISCARD_POS.x)), @as(i32, @intFromFloat(DISCARD_POS.y)));
     var discard_label_buf: [32]u8 = undefined;
     const discard_label = std.fmt.bufPrintZ(&discard_label_buf, "Discard: {d}", .{global_state.discard_pile.count()}) catch "Discard";
-    rl.drawTextEx(game_font, discard_label, .{ .x = DISCARD_POS.x, .y = DISCARD_POS.y + CARD_H + 5 }, 16, 1, .light_gray);
+    rl.drawTextEx(game_font, discard_label, .{ .x = DISCARD_POS.x, .y = DISCARD_POS.y + CARD_H + label_size / 2 }, label_size, 1, .light_gray);
 
     if (removed_count > 0) drawCardBack(card_texture, @as(i32, @intFromFloat(REMOVED_POS.x)), @as(i32, @intFromFloat(REMOVED_POS.y))) else drawSlot(@as(i32, @intFromFloat(REMOVED_POS.x)), @as(i32, @intFromFloat(REMOVED_POS.y)));
-    rl.drawTextEx(game_font, "Removed", .{ .x = REMOVED_POS.x, .y = REMOVED_POS.y + CARD_H + 5 }, 16, 1, .light_gray);
+    rl.drawTextEx(game_font, "Removed", .{ .x = REMOVED_POS.x, .y = REMOVED_POS.y + CARD_H + label_size / 2 }, label_size, 1, .light_gray);
 
     // UI
     if (global_state.phase == .action) {
@@ -615,11 +616,15 @@ export fn updateDrawFrame() void {
     } else if (global_state.phase == .discard) {
         drawButton(CONFIRM_BTN_X, BTN_ROW_Y, BTN_W, BTN_H, "CONFIRM", .dark_gray);
     } else if (global_state.phase == .game_over) {
+        const msg_size = 32;
         const msg = if (global_state.is_won) "VICTORY!" else "DEFEAT";
         const col = if (global_state.is_won) rl.Color.gold else rl.Color.red;
-        const tw = rl.measureTextEx(game_font, msg, 40, 1).x;
-        rl.drawTextEx(game_font, msg, .{ .x = @as(f32, @floatFromInt(@divTrunc(@as(i32, @intCast(SCREEN_WIDTH)) - @as(i32, @intFromFloat(tw)), 2))), .y = 150 }, 40, 1, col);
-        drawButton(CONFIRM_BTN_X, 250, BTN_W, BTN_H, "PLAY AGAIN", .dark_gray);
+        const tw = rl.measureTextEx(game_font, msg, msg_size, 1).x;
+        rl.drawTextEx(game_font, msg, .{
+            .x = @as(f32, @floatFromInt(@divTrunc(@as(i32, @intCast(SCREEN_WIDTH)) - @as(i32, @intFromFloat(tw)), 2))),
+            .y = MARGIN_Y + (HAND_Y + CARD_H - MARGIN_Y - msg_size) / 2,
+        }, msg_size, 1, col);
+        drawButton(CONFIRM_BTN_X, BTN_ROW_Y, BTN_W + 20, BTN_H, "PLAY AGAIN?", .dark_gray);
     }
 
     drawButton(HELP_BTN_X, BTN_ROW_Y, HELP_BTN_W, BTN_H, "HELP", .dark_gray);
