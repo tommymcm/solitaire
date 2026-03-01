@@ -367,6 +367,7 @@ fn processInput() void {
             const box_y = getTutBoxY(step.box_pos);
 
             const tut_next_x = TUT_BOX_X + TUT_BOX_W - TUT_BTN_W - TUT_TEXT_MARGIN;
+            const tut_prev_x = (TUT_BOX_X + TUT_BOX_W - TUT_BTN_W) / 2;
             const tut_btn_y = box_y + TUT_BOX_H - TUT_BTN_H - TUT_TEXT_MARGIN;
             const tut_close_x = TUT_BOX_X + TUT_TEXT_MARGIN;
 
@@ -376,6 +377,9 @@ fn processInput() void {
                     tutorial_active = false;
                     current_step = 0;
                 }
+            }
+            if (current_step > 0 and rl.checkCollisionPointRec(mouse, .{ .x = tut_prev_x, .y = @floatFromInt(tut_btn_y), .width = TUT_BTN_W, .height = TUT_BTN_H })) {
+                current_step -= 1;
             }
             if (rl.checkCollisionPointRec(mouse, .{ .x = tut_close_x, .y = @floatFromInt(tut_btn_y), .width = TUT_BTN_W, .height = TUT_BTN_H })) {
                 tutorial_active = false;
@@ -620,9 +624,15 @@ export fn updateDrawFrame() void {
 
         drawTextWrapped(step.text, @as(i32, @intFromFloat(TUT_BOX_X)) + TUT_TEXT_MARGIN, box_y + TUT_TEXT_MARGIN, TUT_BOX_W - (TUT_TEXT_MARGIN * 2), 20, .ray_white);
 
+        const tut_next_x = TUT_BOX_X + TUT_BOX_W - TUT_BTN_W - TUT_TEXT_MARGIN;
+        const tut_prev_x = (TUT_BOX_X + TUT_BOX_W - TUT_BTN_W) / 2;
         const tut_btn_y = box_y + TUT_BOX_H - TUT_BTN_H - TUT_TEXT_MARGIN;
+        
         drawButton(@as(i32, @intFromFloat(TUT_BOX_X)) + TUT_TEXT_MARGIN, tut_btn_y, TUT_BTN_W, TUT_BTN_H, "CLOSE", .maroon);
-        drawButton(@as(i32, @intFromFloat(TUT_BOX_X)) + TUT_BOX_W - TUT_BTN_W - TUT_TEXT_MARGIN, tut_btn_y, TUT_BTN_W, TUT_BTN_H, if (current_step == tutorial_steps.len - 1) "FINISH" else "NEXT", .dark_green);
+        if (current_step > 0) {
+            drawButton(@as(i32, @intFromFloat(tut_prev_x)), tut_btn_y, TUT_BTN_W, TUT_BTN_H, "PREV", .dark_gray);
+        }
+        drawButton(@as(i32, @intFromFloat(tut_next_x)), tut_btn_y, TUT_BTN_W, TUT_BTN_H, if (current_step == tutorial_steps.len - 1) "FINISH" else "NEXT", .dark_green);
     }
 }
 
