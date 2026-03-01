@@ -8,7 +8,7 @@ const GameState = solitaire.rules.GameState;
 const Card = solitaire.card.Card;
 
 const SCREEN_WIDTH = 600;
-const SCREEN_HEIGHT = 400;
+const SCREEN_HEIGHT = 370;
 
 const CARD_W = 80;
 const CARD_H = 110;
