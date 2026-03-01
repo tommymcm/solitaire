@@ -84,7 +84,10 @@ pub fn main() !void {
 
     rl.initWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Card Capture");
     
-    prng_instance = std.Random.DefaultPrng.init(42);
+    // Seed PRNG with true entropy
+    var seed: u64 = undefined;
+    try std.posix.getrandom(std.mem.asBytes(&seed));
+    prng_instance = std.Random.DefaultPrng.init(seed);
     const random = prng_instance.random();
 
     card_texture = try rl.loadTexture("assets/cards.png");
