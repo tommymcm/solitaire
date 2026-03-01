@@ -531,11 +531,24 @@ export fn updateDrawFrame() void {
 
     // Tutorial Overlay
     if (tutorial_active) {
-        rl.drawRectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, rl.fade(.black, 0.7));
         const step = tutorial_steps[current_step];
+        const dim_color = rl.fade(.black, 0.7);
 
-        if (step.highlight) |rect| {
-            rl.drawRectangleLinesEx(rect, 3, .yellow);
+        if (step.highlight) |h| {
+            const hx: i32 = @intFromFloat(h.x);
+            const hy: i32 = @intFromFloat(h.y);
+            const hw: i32 = @intFromFloat(h.width);
+            const hh: i32 = @intFromFloat(h.height);
+
+            // Draw dimming in 4 pieces around the highlight
+            rl.drawRectangle(0, 0, SCREEN_WIDTH, hy, dim_color); // Top
+            rl.drawRectangle(0, hy + hh, SCREEN_WIDTH, SCREEN_HEIGHT - (hy + hh), dim_color); // Bottom
+            rl.drawRectangle(0, hy, hx, hh, dim_color); // Left
+            rl.drawRectangle(hx + hw, hy, SCREEN_WIDTH - (hx + hw), hh, dim_color); // Right
+
+            rl.drawRectangleLinesEx(h, 3, .yellow);
+        } else {
+            rl.drawRectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, dim_color);
         }
 
         const box_rect = rl.Rectangle{ .x = TUT_BOX_X, .y = TUT_BOX_Y, .width = TUT_BOX_W, .height = TUT_BOX_H };
