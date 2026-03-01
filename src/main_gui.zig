@@ -93,15 +93,58 @@ const TutorialStep = struct {
 
 const tutorial_steps = [_]TutorialStep{
     .{ .text = "Welcome to CARD CAPTURE! Click Next to learn the basics." },
-    .{ .text = "This is the ENEMY DECK. It contains cards you must capture to win.", .highlight = .{ .x = ENEMY_DECK_POS.x - 5, .y = ENEMY_DECK_POS.y - 5, .width = CARD_W + 10, .height = CARD_H + 30 } },
-    .{ .text = "This is the FIELD. Opponent cards move here from left to right. Your goal is to clear these!", .highlight = .{ .x = FIELD_X - 10, .y = FIELD_Y - 10, .width = (CARD_W + CARD_SPACING) * 4, .height = CARD_H + 20 } },
-    .{ .text = "This is your HAND. You use these cards to interact with the field.", .highlight = .{ .x = HAND_X - 10, .y = HAND_Y - 10, .width = (CARD_W + CARD_SPACING) * 4, .height = CARD_H + 20 } },
-    .{ .text = "To CAPTURE: Select cards in hand that match a field card's SUIT, with a sum greater than or equal to its VALUE, then click the field card.", .highlight = .{ .x = FIELD_X - 10, .y = FIELD_Y - 10, .width = (CARD_W + CARD_SPACING) * 4, .height = (HAND_Y + CARD_H) - FIELD_Y + 20 } },
-    .{ .text = "NOTE: Jokers MIMIC the highest VALUE card in your hand of the matching SUIT.", .highlight = .{ .x = HAND_X - 10, .y = HAND_Y - 10, .width = (CARD_W + CARD_SPACING) * 4, .height = CARD_H + 20 } },
-    .{ .text = "To SACRIFICE: Select ONE hand card and click this. Both it and the rightmost field card are REMOVED forever.", .highlight = .{ .x = SACRIFICE_BTN_X - 5, .y = BTN_ROW_Y - 5, .width = BTN_W + 10, .height = BTN_H + 10 } },
-    .{ .text = "To DELAY: Select TWO hand cards to REMOVE, the rightmost field card goes to the bottom of the ENEMY DECK.", .highlight = .{ .x = DELAY_BTN_X - 5, .y = BTN_ROW_Y - 5, .width = BTN_W + 10, .height = BTN_H + 10 } },
     .{
-        .text = "Goal: Capture all FACE CARDS (A, J, Q, K)! If FACE CARD is removed, you lose immediately.",
+        .text = "This is the ENEMY DECK. It contains cards you must capture to win.",
+        .highlight = .{ .x = ENEMY_DECK_POS.x - 5, .y = ENEMY_DECK_POS.y - 5, .width = CARD_W + 10, .height = CARD_H + 30 },
+    },
+    .{
+        .text = "This is the FIELD. Your goal is to clear these!",
+        .highlight = .{ .x = FIELD_X - 10, .y = FIELD_Y - 10, .width = (CARD_W + CARD_SPACING) * 4, .height = CARD_H + 20 },
+    },
+    .{
+        .text = "This is your HAND. You use these cards to interact with the field.",
+        .highlight = .{ .x = HAND_X - 10, .y = HAND_Y - 10, .width = (CARD_W + CARD_SPACING) * 4, .height = CARD_H + 20 },
+    },
+    .{
+        .text = "At the start of your TURN, you may DISCARD any number of cards.",
+        .highlight = .{ .x = HAND_X - 10, .y = HAND_Y - 10, .width = (CARD_W + CARD_SPACING) * 4, .height = CARD_H + 20 },
+    },
+    .{
+        .text = "Then, draw from your DECK until you have FOUR cards in your HAND.",
+        .highlight = .{ .x = PLAYER_DECK_POS.x - 5, .y = PLAYER_DECK_POS.y - 5, .width = CARD_W + 10, .height = CARD_H + 30 },
+    },
+    .{
+        .text = "If your DECK is empty, SHUFFLE your DISCARD PILE. It becomes your new DECK.",
+        .highlight = .{ .x = DISCARD_POS.x - 5, .y = DISCARD_POS.y - 5, .width = CARD_W + 10, .height = CARD_H + 30 },
+    },
+    .{
+        .text = "On your TURN, you may take ONE of three actions: CAPTURE, SACRIFICE, or DELAY.",
+    },
+    .{
+        .text = "To CAPTURE: Select cards with the same SUIT in your HAND. Then, select a field card of equal or lesser VALUE to CAPTURE.",
+        .highlight = .{ .x = FIELD_X - 10, .y = FIELD_Y - 10, .width = (CARD_W + CARD_SPACING) * 4, .height = (HAND_Y + CARD_H) - FIELD_Y + 20 },
+    },
+    .{
+        .text = "Then, place the CAPTURED card and all cards used from your HAND in your DISCARD pile.",
+        .highlight = .{ .x = DISCARD_POS.x - 5, .y = DISCARD_POS.y - 5, .width = CARD_W + 10, .height = CARD_H + 30 },
+    },
+    .{
+        .text = "NOTE: Jokers MIMIC the highest VALUE card in your hand of the matching SUIT.",
+    },
+    .{
+        .text = "To SACRIFICE: Select ONE hand card and click this. Both it and the rightmost field card are REMOVED forever.",
+        .highlight = .{ .x = SACRIFICE_BTN_X - 5, .y = BTN_ROW_Y - 5, .width = BTN_W + 10, .height = BTN_H + 10 },
+    },
+    .{
+        .text = "To DELAY: Select TWO hand cards to REMOVE, the rightmost field card goes to the bottom of the ENEMY DECK.",
+        .highlight = .{ .x = DELAY_BTN_X - 5, .y = BTN_ROW_Y - 5, .width = BTN_W + 10, .height = BTN_H + 10 },
+    },
+    .{
+        .text = "After your TURN, cards in the FIELD move to the RIGHT and a new card is drawn from the ENEMY DECK.",
+        .highlight = .{ .x = FIELD_X - 10, .y = FIELD_Y - 10, .width = (CARD_W + CARD_SPACING) * 4, .height = CARD_H + 20 },
+    },
+    .{
+        .text = "To WIN: Capture all FACE CARDS (A, J, Q, K)! If a FACE CARD is REMOVED, you LOSE...",
     },
 };
 
