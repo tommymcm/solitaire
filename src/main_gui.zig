@@ -88,7 +88,8 @@ fn processInput() void {
 
         // Check Field Clicks
         for (0..4) |i| {
-            const x = @as(f32, @floatFromInt(FIELD_X + @as(i32, @intCast(i)) * (CARD_W + SPACING)));
+            // Index 0 is rightmost (3-i)
+            const x = @as(f32, @floatFromInt(FIELD_X + @as(i32, @intCast(3 - i)) * (CARD_W + SPACING)));
             const rect = rl.Rectangle{ .x = x, .y = FIELD_Y, .width = CARD_W, .height = CARD_H };
             if (rl.checkCollisionPointRec(mouse, rect)) {
                 if (global_state.field[i] != null) {
@@ -239,7 +240,8 @@ export fn updateDrawFrame() void {
 
     // Draw field
     for (global_state.field, 0..) |maybe_card, i| {
-        const x = FIELD_X + @as(i32, @intCast(i)) * (CARD_W + SPACING);
+        // Index 0 is rightmost (3-i)
+        const x = FIELD_X + @as(i32, @intCast(3 - i)) * (CARD_W + SPACING);
         drawSlot(x, FIELD_Y);
         if (maybe_card) |card| {
             drawCard(card_texture, x, FIELD_Y, card);
