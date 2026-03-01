@@ -114,8 +114,8 @@ test "deck refill from discard pile" {
     for (0..4) |i| state.hand[i] = null;
 
     // Put some cards in the discard pile
-    try state.discard_pile.cards.append(allocator, Card{ .rank = .ace, .suit = .spades });
-    try state.discard_pile.cards.append(allocator, Card{ .rank = .ten, .suit = .hearts });
+    try state.discard_pile.append(Card{ .rank = .ace, .suit = .spades });
+    try state.discard_pile.append(Card{ .rank = .ten, .suit = .hearts });
 
     // Refill hand should move discard to deck and shuffle
     state.refillHand();
@@ -248,7 +248,7 @@ test "phase machine transitions" {
         // One card was added to bottom, one card was drawn to refill field.
         // So net change to enemy deck count should be 0.
         try std.testing.expectEqual(@as(usize, enemy_count_before), state.enemy_deck.count());
-        try std.testing.expectEqual(Card{ .rank = .four, .suit = .hearts }, state.enemy_deck.cards.items[0]);
+        try std.testing.expectEqual(Card{ .rank = .four, .suit = .hearts }, state.enemy_deck.cards[0]);
 
         // Verify field state after refill
         // Slot [0] should now be 5H
