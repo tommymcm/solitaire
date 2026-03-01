@@ -107,17 +107,17 @@ const tutorial_steps = [_]TutorialStep{
     },
     .{
         .text = "This is the FIELD. Your goal is to CAPTURE or REMOVE these.",
-        .highlight = .{ .x = FIELD_X - 10, .y = FIELD_Y - 10, .width = (CARD_W * 4) + (CARD_SPACING * 3) + 20, .height = CARD_H + 20 },
+        .highlight = .{ .x = FIELD_X - 10, .y = FIELD_Y - 10, .width = (CARD_W + CARD_SPACING) * 4, .height = CARD_H + 20 },
         .box_pos = .bottom,
     },
     .{
         .text = "This is your HAND. You use these cards to interact with the field.",
-        .highlight = .{ .x = HAND_X - 10, .y = HAND_Y - 10, .width = (CARD_W * 4) + (CARD_SPACING * 3) + 20, .height = CARD_H + 20 },
+        .highlight = .{ .x = HAND_X - 10, .y = HAND_Y - 10, .width = (CARD_W + CARD_SPACING) * 4, .height = CARD_H + 20 },
         .box_pos = .top,
     },
     .{
         .text = "At the start of your TURN, you may DISCARD any number of cards.",
-        .highlight = .{ .x = HAND_X - 10, .y = HAND_Y - 10, .width = (CARD_W * 4) + (CARD_SPACING * 3) + 20, .height = CARD_H + 20 },
+        .highlight = .{ .x = HAND_X - 10, .y = HAND_Y - 10, .width = (CARD_W + CARD_SPACING) * 4, .height = CARD_H + 20 },
         .box_pos = .top,
     },
     .{
@@ -135,7 +135,7 @@ const tutorial_steps = [_]TutorialStep{
     },
     .{
         .text = "To CAPTURE: Select cards with the same SUIT in your HAND. Then, select a field card of equal or lesser VALUE to CAPTURE.",
-        .highlight = .{ .x = FIELD_X - 10, .y = FIELD_Y - 10, .width = (CARD_W * 4) + (CARD_SPACING * 3) + 20, .height = (HAND_Y + CARD_H) - FIELD_Y + 20 },
+        .highlight = .{ .x = FIELD_X - 10, .y = FIELD_Y - 10, .width = (CARD_W + CARD_SPACING) * 4, .height = (HAND_Y + CARD_H) - FIELD_Y + 20 },
         .box_pos = .bottom,
     },
     .{
@@ -158,7 +158,7 @@ const tutorial_steps = [_]TutorialStep{
     },
     .{
         .text = "After your TURN, cards in the FIELD move to the RIGHT and a new card is drawn from the ENEMY DECK.",
-        .highlight = .{ .x = FIELD_X - 10, .y = FIELD_Y - 10, .width = (CARD_W * 4) + (CARD_SPACING * 3) + 20, .height = CARD_H + 20 },
+        .highlight = .{ .x = FIELD_X - 10, .y = FIELD_Y - 10, .width = (CARD_W + CARD_SPACING) * 4, .height = CARD_H + 20 },
         .box_pos = .bottom,
     },
     .{
@@ -177,7 +177,6 @@ var main_allocator: std.mem.Allocator = undefined;
 // Selection State
 var selected_hand: [4]bool = [_]bool{false} ** 4;
 var selected_field: ?usize = null;
-var status_message: [128:0]u8 = [_:0]u8{0} ** 128;
 
 // Animation State
 var field_visuals: [4]?VisualCard = [_]?VisualCard{null} ** 4;
@@ -243,7 +242,6 @@ fn restartGame() !void {
 
     syncVisuals(.none);
     is_initialized = true;
-    _ = std.fmt.bufPrintZ(&status_message, "Card Capture", .{}) catch unreachable;
 }
 
 const ActionType = enum { none, capture, sacrifice, delay, discard };
@@ -424,7 +422,6 @@ fn processInput() void {
                     if (count > 0 and global_state.phase == .action) {
                         if (global_state.playCapture(h_indices[0..count], i, null)) |success| {
                             if (success) {
-                                _ = std.fmt.bufPrintZ(&status_message, "Capture successful!", .{}) catch unreachable;
                                 resetSelection();
                                 syncVisuals(.capture);
                                 return;
@@ -465,17 +462,13 @@ fn handleSacrifice() void {
         last_idx = i;
     };
 
-    if (count != 1) {
-        _ = std.fmt.bufPrintZ(&status_message, "Select ONE hand card!", .{}) catch unreachable;
-        return;
-    }
+    if (count != 1) return;
 
     if (global_state.playSacrifice(last_idx)) {
-        _ = std.fmt.bufPrintZ(&status_message, "Sacrifice successful!", .{}) catch unreachable;
         removed_count += 2;
         resetSelection();
         syncVisuals(.sacrifice);
-    } else _ = std.fmt.bufPrintZ(&status_message, "Invalid sacrifice!", .{}) catch unreachable;
+    }
 }
 
 fn handleDelay() void {
@@ -486,19 +479,15 @@ fn handleDelay() void {
         count += 1;
     };
 
-    if (count != 2) {
-        _ = std.fmt.bufPrintZ(&status_message, "Select TWO hand cards!", .{}) catch unreachable;
-        return;
-    }
+    if (count != 2) return;
 
     if (global_state.playDelay(h_indices)) |success| {
         if (success) {
-            _ = std.fmt.bufPrintZ(&status_message, "Delay successful!", .{}) catch unreachable;
             removed_count += 2;
             resetSelection();
             syncVisuals(.delay);
-        } else _ = std.fmt.bufPrintZ(&status_message, "Invalid delay!", .{}) catch unreachable;
-    } else |err| _ = std.fmt.bufPrintZ(&status_message, "Error: {any}", .{err}) catch unreachable;
+        }
+    } else |_| {}
 }
 
 fn handleDiscard() void {
@@ -509,11 +498,9 @@ fn handleDiscard() void {
         count += 1;
     };
 
-    global_state.playDiscard(h_indices[0..count]) catch |err| {
-        _ = std.fmt.bufPrintZ(&status_message, "Discard error: {any}", .{err}) catch unreachable;
+    global_state.playDiscard(h_indices[0..count]) catch {
         return;
     };
-    _ = std.fmt.bufPrintZ(&status_message, "Discarded {d} cards.", .{count}) catch unreachable;
     resetSelection();
     syncVisuals(.discard);
 }
@@ -602,11 +589,6 @@ export fn updateDrawFrame() void {
 
     drawButton(HELP_BTN_X, BTN_ROW_Y, HELP_BTN_W, BTN_H, "HELP", .dark_gray);
 
-    if (global_state.phase != .game_over) {
-        const sw_msg = rl.measureText(&status_message, 20);
-        rl.drawText(&status_message, @divTrunc(SCREEN_WIDTH - sw_msg, 2), 15, 20, .ray_white);
-    }
-
     // Tutorial Overlay
     if (tutorial_active) {
         const step = tutorial_steps[current_step];
@@ -618,11 +600,10 @@ export fn updateDrawFrame() void {
             const hw: i32 = @intFromFloat(h.width);
             const hh: i32 = @intFromFloat(h.height);
 
-            // Draw dimming in 4 pieces around the highlight
-            rl.drawRectangle(0, 0, SCREEN_WIDTH, hy, dim_color); // Top
-            rl.drawRectangle(0, hy + hh, SCREEN_WIDTH, SCREEN_HEIGHT - (hy + hh), dim_color); // Bottom
-            rl.drawRectangle(0, hy, hx, hh, dim_color); // Left
-            rl.drawRectangle(hx + hw, hy, SCREEN_WIDTH - (hx + hw), hh, dim_color); // Right
+            rl.drawRectangle(0, 0, SCREEN_WIDTH, hy, dim_color);
+            rl.drawRectangle(0, hy + hh, SCREEN_WIDTH, SCREEN_HEIGHT - (hy + hh), dim_color);
+            rl.drawRectangle(0, hy, hx, hh, dim_color);
+            rl.drawRectangle(hx + hw, hy, SCREEN_WIDTH - (hx + hw), hh, dim_color);
 
             rl.drawRectangleLinesEx(h, 3, .yellow);
         } else {
@@ -649,7 +630,6 @@ fn drawTextWrapped(text: [:0]const u8, x: i32, y: i32, width: i32, fontSize: i32
 
     var it = std.mem.tokenizeAny(u8, text, " ");
     while (it.next()) |word| {
-        // Use a local buffer for the word to add null terminator
         var word_buf: [128:0]u8 = undefined;
         const word_z: [:0]const u8 = std.fmt.bufPrintZ(&word_buf, "{s}", .{word}) catch "err";
 
