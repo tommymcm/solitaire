@@ -35,10 +35,16 @@ pub fn build(b: *std.Build) !void {
 
         const install_dir: std.Build.InstallDir = .{ .custom = "web" };
         
-        // Add --preload-file assets to emcc flags
+        // Add --preload-file assets and --shell-file to emcc flags
+        // Some versions of emccStep take a slice, others a HashMap. 
+        // Based on previous error, it expects a HashMap for .flags
         var emcc_flags = emsdk.emccDefaultFlags(b.allocator, .{ .optimize = optimize });
-        try emcc_flags.put("--preload-file", {});
-        try emcc_flags.put("assets", {});
+        
+        // Remove potentially conflicting flags if any
+        _ = emcc_flags.remove("--shell-file");
+        
+        try emcc_flags.put("--preload-file assets", {});
+        try emcc_flags.put("--shell-file web/shell.html", {});
 
         var emcc_settings = emsdk.emccDefaultSettings(b.allocator, .{ .optimize = optimize });
         try emcc_settings.put("ALLOW_MEMORY_GROWTH", "1");
