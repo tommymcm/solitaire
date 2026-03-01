@@ -98,6 +98,10 @@ const TutorialStep = struct {
     box_pos: TutBoxPos = .center,
 };
 
+const HL_FIELD_OFF = 10;
+const HL_FIELD_W = (CARD_W + CARD_SPACING) * 4 - CARD_SPACING + HL_FIELD_OFF * 2;
+const HL_FIELD_H = CARD_H + HL_FIELD_OFF * 2;
+
 const tutorial_steps = [_]TutorialStep{
     .{ .text = "Welcome to CARD CAPTURE! Click Next to learn the basics." },
     .{
@@ -107,17 +111,17 @@ const tutorial_steps = [_]TutorialStep{
     },
     .{
         .text = "This is the FIELD. Your goal is to CAPTURE or REMOVE these.",
-        .highlight = .{ .x = FIELD_X - 10, .y = FIELD_Y - 10, .width = (CARD_W + CARD_SPACING) * 4, .height = CARD_H + 20 },
+        .highlight = .{ .x = FIELD_X - HL_FIELD_OFF, .y = FIELD_Y - HL_FIELD_OFF, .width = HL_FIELD_W, .height = HL_FIELD_H },
         .box_pos = .bottom,
     },
     .{
         .text = "This is your HAND. You use these cards to interact with the field.",
-        .highlight = .{ .x = HAND_X - 10, .y = HAND_Y - 10, .width = (CARD_W + CARD_SPACING) * 4, .height = CARD_H + 20 },
+        .highlight = .{ .x = HAND_X - HL_FIELD_OFF, .y = HAND_Y - HL_FIELD_OFF, .width = HL_FIELD_W, .height = HL_FIELD_H },
         .box_pos = .top,
     },
     .{
         .text = "At the start of your TURN, you may DISCARD any number of cards.",
-        .highlight = .{ .x = HAND_X - 10, .y = HAND_Y - 10, .width = (CARD_W + CARD_SPACING) * 4, .height = CARD_H + 20 },
+        .highlight = .{ .x = HAND_X - HL_FIELD_OFF, .y = HAND_Y - HL_FIELD_OFF, .width = HL_FIELD_W, .height = HL_FIELD_H },
         .box_pos = .top,
     },
     .{
@@ -135,7 +139,7 @@ const tutorial_steps = [_]TutorialStep{
     },
     .{
         .text = "To CAPTURE: Select cards with the same SUIT in your HAND. Then, select a field card of equal or lesser VALUE to CAPTURE.",
-        .highlight = .{ .x = FIELD_X - 10, .y = FIELD_Y - 10, .width = (CARD_W + CARD_SPACING) * 4, .height = (HAND_Y + CARD_H) - FIELD_Y + 20 },
+        .highlight = .{ .x = FIELD_X - HL_FIELD_OFF, .y = FIELD_Y - HL_FIELD_OFF, .width = HL_FIELD_W, .height = (HAND_Y + CARD_H) - FIELD_Y + 20 },
         .box_pos = .bottom,
     },
     .{
@@ -158,7 +162,7 @@ const tutorial_steps = [_]TutorialStep{
     },
     .{
         .text = "After your TURN, cards in the FIELD move to the RIGHT and a new card is drawn from the ENEMY DECK.",
-        .highlight = .{ .x = FIELD_X - 10, .y = FIELD_Y - 10, .width = (CARD_W + CARD_SPACING) * 4, .height = CARD_H + 20 },
+        .highlight = .{ .x = FIELD_X - HL_FIELD_OFF, .y = FIELD_Y - HL_FIELD_OFF, .width = HL_FIELD_W, .height = HL_FIELD_H },
         .box_pos = .bottom,
     },
     .{
@@ -612,15 +616,6 @@ export fn updateDrawFrame() void {
     }
 
     drawButton(HELP_BTN_X, BTN_ROW_Y, HELP_BTN_W, BTN_H, "HELP", .dark_gray);
-
-    if (global_state.phase != .game_over) {
-        const phase_msg = if (global_state.phase == .action) "ACTION" else "DISCARD";
-        rl.drawTextEx(game_font, phase_msg, .{ .x = 15, .y = 10 }, 20, 1, .gold);
-    }
-
-    var score_buf: [64]u8 = undefined;
-    const score_text = std.fmt.bufPrintZ(&score_buf, "Score: {d}", .{global_state.captured_count}) catch "Score: ERROR";
-    rl.drawTextEx(game_font, score_text, .{ .x = 15, .y = 370 - 25 }, 20, 1, .ray_white);
 
     // Tutorial Overlay
     if (tutorial_active) {
