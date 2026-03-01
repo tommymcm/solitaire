@@ -40,7 +40,7 @@ const VisualCard = struct {
         if (!self.active) return;
         const dx = self.target_pos.x - self.pos.x;
         const dy = self.target_pos.y - self.pos.y;
-        
+
         const adx = if (dx < 0) -dx else dx;
         const ady = if (dy < 0) -dy else dy;
 
@@ -68,31 +68,13 @@ const TutorialStep = struct {
 
 const tutorial_steps = [_]TutorialStep{
     .{ .text = "Welcome to Card Capture! Click Next to learn the basics." },
-    .{ 
-        .text = "This is the Enemy Deck. It contains cards you must capture to win.",
-        .highlight = .{ .x = 10, .y = 55, .width = CARD_W + 10, .height = CARD_H + 30 }
-    },
-    .{ 
-        .text = "This is the Field. Opponent cards move here. You want to clear these!",
-        .highlight = .{ .x = FIELD_X - 10, .y = FIELD_Y - 10, .width = (CARD_W + SPACING) * 4, .height = CARD_H + 20 }
-    },
-    .{ 
-        .text = "This is your Hand. You use these cards to interact with the field.",
-        .highlight = .{ .x = HAND_X - 10, .y = HAND_Y - 10, .width = (CARD_W + SPACING) * 4, .height = CARD_H + 20 }
-    },
-    .{ 
-        .text = "To CAPTURE: Select cards in hand that match the field card's SUIT and sum to its VALUE, then click the field card.",
-        .highlight = .{ .x = FIELD_X - 10, .y = FIELD_Y - 10, .width = (CARD_W + SPACING) * 4, .height = CARD_H + 150 }
-    },
-    .{ 
-        .text = "To SACRIFICE: Select ONE hand card and click this. Both it and the rightmost field card are REMOVED forever.",
-        .highlight = .{ .x = 190, .y = 355, .width = 110, .height = 40 }
-    },
-    .{ 
-        .text = "To DELAY: Select TWO hand cards and click this. They are REMOVED, and the field card goes back to the deck.",
-        .highlight = .{ .x = 305, .y = 355, .width = 110, .height = 40 }
-    },
-    .{ 
+    .{ .text = "This is the Enemy Deck. It contains cards you must capture to win.", .highlight = .{ .x = 10, .y = 55, .width = CARD_W + 10, .height = CARD_H + 30 } },
+    .{ .text = "This is the Field. Opponent cards move here. You want to clear these!", .highlight = .{ .x = FIELD_X - 10, .y = FIELD_Y - 10, .width = (CARD_W + SPACING) * 4, .height = CARD_H + 20 } },
+    .{ .text = "This is your Hand. You use these cards to interact with the field.", .highlight = .{ .x = HAND_X - 10, .y = HAND_Y - 10, .width = (CARD_W + SPACING) * 4, .height = CARD_H + 20 } },
+    .{ .text = "To CAPTURE: Select cards in hand that match the field card's SUIT and sum to its VALUE, then click the field card.", .highlight = .{ .x = FIELD_X - 10, .y = FIELD_Y - 10, .width = (CARD_W + SPACING) * 4, .height = CARD_H + 150 } },
+    .{ .text = "To SACRIFICE: Select ONE hand card and click this. Both it and the rightmost field card are REMOVED forever.", .highlight = .{ .x = 190, .y = 355, .width = 110, .height = 40 } },
+    .{ .text = "To DELAY: Select TWO hand cards and click this. They are REMOVED, and the field card goes back to the deck.", .highlight = .{ .x = 305, .y = 355, .width = 110, .height = 40 } },
+    .{
         .text = "Goal: Capture all cards! If you lose a Face Card (A, J, Q, K) via sacrifice, you lose immediately.",
     },
 };
@@ -127,7 +109,7 @@ pub fn main() !void {
         gpa_instance.allocator();
 
     rl.initWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Card Capture");
-    
+
     var seed: u64 = undefined;
     try std.posix.getrandom(std.mem.asBytes(&seed));
     prng_instance = std.Random.DefaultPrng.init(seed);
@@ -158,23 +140,23 @@ fn restartGame() !void {
     if (is_initialized) {
         global_state.deinit();
     }
-    
+
     const random = prng_instance.random();
     global_state = try GameState.init(main_allocator, random);
-    
+
     for (0..4) |i| selected_hand[i] = false;
     selected_field = null;
-    
+
     for (0..4) |i| {
         field_visuals[i] = null;
         hand_visuals[i] = null;
     }
     for (0..16) |i| flying_visuals[i] = null;
     removed_count = 0;
-    
+
     syncVisuals(.none);
     is_initialized = true;
-    _ = std.fmt.bufPrintZ(&status_message, "Welcome! Select hand then click field to capture.", .{}) catch unreachable;
+    _ = std.fmt.bufPrintZ(&status_message, "Card Capture", .{}) catch unreachable;
 }
 
 const ActionType = enum { none, capture, sacrifice, delay, discard };
@@ -331,7 +313,10 @@ fn processInput() void {
                 if (global_state.field[i]) |_| {
                     var h_indices: [4]usize = undefined;
                     var count: usize = 0;
-                    for (selected_hand, 0..) |sel, j| if (sel) { h_indices[count] = j; count += 1; };
+                    for (selected_hand, 0..) |sel, j| if (sel) {
+                        h_indices[count] = j;
+                        count += 1;
+                    };
 
                     if (count > 0 and global_state.phase == .action) {
                         if (global_state.playCapture(h_indices[0..count], i, null)) |success| {
@@ -339,11 +324,11 @@ fn processInput() void {
                                 _ = std.fmt.bufPrintZ(&status_message, "Capture successful!", .{}) catch unreachable;
                                 resetSelection();
                                 syncVisuals(.capture);
-                                return; 
+                                return;
                             }
                         } else |_| {}
                     }
-                    
+
                     if (selected_field == i) {
                         selected_field = null;
                     } else {
@@ -373,7 +358,10 @@ fn processInput() void {
 fn handleSacrifice() void {
     var count: usize = 0;
     var last_idx: usize = 0;
-    for (selected_hand, 0..) |sel, i| if (sel) { count += 1; last_idx = i; };
+    for (selected_hand, 0..) |sel, i| if (sel) {
+        count += 1;
+        last_idx = i;
+    };
 
     if (count != 1) {
         _ = std.fmt.bufPrintZ(&status_message, "Select ONE hand card!", .{}) catch unreachable;
@@ -391,7 +379,10 @@ fn handleSacrifice() void {
 fn handleDelay() void {
     var h_indices: [2]usize = undefined;
     var count: usize = 0;
-    for (selected_hand, 0..) |sel, i| if (sel and count < 2) { h_indices[count] = i; count += 1; };
+    for (selected_hand, 0..) |sel, i| if (sel and count < 2) {
+        h_indices[count] = i;
+        count += 1;
+    };
 
     if (count != 2) {
         _ = std.fmt.bufPrintZ(&status_message, "Select TWO hand cards!", .{}) catch unreachable;
@@ -411,7 +402,10 @@ fn handleDelay() void {
 fn handleDiscard() void {
     var h_indices: [4]usize = undefined;
     var count: usize = 0;
-    for (selected_hand, 0..) |sel, i| if (sel) { h_indices[count] = i; count += 1; };
+    for (selected_hand, 0..) |sel, i| if (sel) {
+        h_indices[count] = i;
+        count += 1;
+    };
 
     global_state.playDiscard(h_indices[0..count]) catch |err| {
         _ = std.fmt.bufPrintZ(&status_message, "Discard error: {any}", .{err}) catch unreachable;
@@ -473,7 +467,7 @@ export fn updateDrawFrame() void {
     var enemy_label_buf: [32]u8 = undefined;
     const enemy_label = std.fmt.bufPrintZ(&enemy_label_buf, "Enemy: {d}", .{global_state.enemy_deck.count()}) catch "Enemy";
     rl.drawText(enemy_label, @as(i32, @intFromFloat(ENEMY_DECK_POS.x)), @as(i32, @intFromFloat(ENEMY_DECK_POS.y)) + CARD_H + 5, 10, .light_gray);
-    
+
     if (global_state.deck.count() > 0) {
         drawCardBack(card_texture, @as(i32, @intFromFloat(PLAYER_DECK_POS.x)), @as(i32, @intFromFloat(PLAYER_DECK_POS.y)));
     } else drawSlot(@as(i32, @intFromFloat(PLAYER_DECK_POS.x)), @as(i32, @intFromFloat(PLAYER_DECK_POS.y)));
@@ -489,39 +483,31 @@ export fn updateDrawFrame() void {
     const discard_label = std.fmt.bufPrintZ(&discard_label_buf, "Discard: {d}", .{global_state.discard_pile.count()}) catch "Discard";
     rl.drawText(discard_label, @as(i32, @intFromFloat(DISCARD_POS.x)), @as(i32, @intFromFloat(DISCARD_POS.y)) + CARD_H + 5, 10, .light_gray);
 
-    if (removed_count > 0) drawCardBack(card_texture, @as(i32, @intFromFloat(REMOVED_POS.x)), @as(i32, @intFromFloat(REMOVED_POS.y)))
-    else drawSlot(@as(i32, @intFromFloat(REMOVED_POS.x)), @as(i32, @intFromFloat(REMOVED_POS.y)));
+    if (removed_count > 0) drawCardBack(card_texture, @as(i32, @intFromFloat(REMOVED_POS.x)), @as(i32, @intFromFloat(REMOVED_POS.y))) else drawSlot(@as(i32, @intFromFloat(REMOVED_POS.x)), @as(i32, @intFromFloat(REMOVED_POS.y)));
     rl.drawText("Removed", @as(i32, @intFromFloat(REMOVED_POS.x)), @as(i32, @intFromFloat(REMOVED_POS.y)) + CARD_H + 5, 10, .light_gray);
 
     // UI
+    const BTN_HEIGHT = 30;
+    const BTN_WIDTH = 100;
     const BTN_Y = 360;
     if (global_state.phase == .action) {
-        drawButton(190, BTN_Y, 100, 30, "SACRIFICE", .orange);
-        drawButton(310, BTN_Y, 100, 30, "DELAY", .dark_blue);
-    } else if (global_state.phase == .discard) drawButton(250, BTN_Y, 100, 30, "CONFIRM", .dark_gray)
-    else if (global_state.phase == .game_over) {
+        drawButton(190, BTN_Y, BTN_WIDTH, BTN_HEIGHT, "SACRIFICE", .orange);
+        drawButton(310, BTN_Y, BTN_WIDTH, BTN_HEIGHT, "DELAY", .dark_blue);
+    } else if (global_state.phase == .discard) drawButton(250, BTN_Y, 100, 30, "CONFIRM", .dark_gray) else if (global_state.phase == .game_over) {
         const msg = if (global_state.is_won) "VICTORY!" else "DEFEAT";
         const col = if (global_state.is_won) rl.Color.gold else rl.Color.red;
         rl.drawText(msg, @divTrunc(SCREEN_WIDTH - rl.measureText(msg, 40), 2), 150, 40, col);
         drawButton(250, 250, 100, 30, "PLAY AGAIN", .dark_gray);
     }
 
-    drawButton(SCREEN_WIDTH - 110, 10, 100, 30, "TOOLTIP", .dark_gray);
-
-    if (global_state.phase != .game_over) {
-        const sw_msg = rl.measureText(&status_message, 20);
-        rl.drawText(&status_message, @divTrunc(SCREEN_WIDTH - sw_msg, 2), 15, 20, .ray_white);
-        rl.drawText(if (global_state.phase == .action) "ACTION" else "DISCARD", 15, 10, 20, .gold);
-    }
-    
-    var score_buf: [64]u8 = undefined;
-    rl.drawText(std.fmt.bufPrintZ(&score_buf, "Score: {d}", .{global_state.captured_count}) catch "Score: ERROR", 15, 370, 20, .ray_white);
+    const HELP_BTN_WIDTH = 80;
+    drawButton(SCREEN_WIDTH - (HELP_BTN_WIDTH + 10), BTN_Y, HELP_BTN_WIDTH, 30, "HELP", .dark_gray);
 
     // Tutorial Overlay
     if (tutorial_active) {
         rl.drawRectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, rl.fade(.black, 0.7));
         const step = tutorial_steps[current_step];
-        
+
         if (step.highlight) |rect| {
             rl.drawRectangleLinesEx(rect, 3, .yellow);
         }
@@ -529,7 +515,7 @@ export fn updateDrawFrame() void {
         const box_rect = rl.Rectangle{ .x = 50, .y = 125, .width = 500, .height = 150 };
         rl.drawRectangleRec(box_rect, .dark_gray);
         rl.drawRectangleLinesEx(box_rect, 2, .ray_white);
-        
+
         drawTextWrapped(step.text, 70, 145, 460, 20, .ray_white);
 
         drawButton(70, 225, 80, 30, "CLOSE", .maroon);
@@ -546,7 +532,7 @@ fn drawTextWrapped(text: [:0]const u8, x: i32, y: i32, width: i32, fontSize: i32
     while (it.next()) |word| {
         var word_buf: [128:0]u8 = undefined;
         const word_z: [:0]const u8 = std.fmt.bufPrintZ(&word_buf, "{s}", .{word}) catch "err";
-        
+
         const word_width = rl.measureText(word_z, fontSize);
         if (cursor_x + word_width > x + width) {
             cursor_x = x;
@@ -558,24 +544,39 @@ fn drawTextWrapped(text: [:0]const u8, x: i32, y: i32, width: i32, fontSize: i32
 }
 
 fn drawButton(x: i32, y: i32, w: i32, h: i32, text: [:0]const u8, color: rl.Color) void {
+    const font_size = 14;
     const rect = rl.Rectangle{ .x = @floatFromInt(x), .y = @floatFromInt(y), .width = @floatFromInt(w), .height = @floatFromInt(h) };
     rl.drawRectangleRec(rect, color);
     rl.drawRectangleLinesEx(rect, 2, .ray_white);
-    const tw = rl.measureText(text, 10);
-    rl.drawText(text, x + @divTrunc(w - tw, 2), y + @divTrunc(h - 10, 2), 10, .ray_white);
+    const tw = rl.measureText(text, font_size);
+    rl.drawText(text, x + @divTrunc(w - tw, 2), y + @divTrunc(h - font_size, 2), font_size, .ray_white);
 }
 
-fn drawSlot(x: i32, y: i32) void { rl.drawRectangleLines(x, y, CARD_W, CARD_H, .gray); }
+fn drawSlot(x: i32, y: i32) void {
+    rl.drawRectangleLines(x, y, CARD_W, CARD_H, .gray);
+}
 
 fn drawCard(tex: rl.Texture2D, x: i32, y: i32, card: Card) void {
     const sw = @as(f32, @floatFromInt(tex.width)) / SHEET_COLS;
     const sh = @as(f32, @floatFromInt(tex.height)) / SHEET_ROWS;
-    var col: f32 = 0; var row: f32 = 0;
-    if (card.rank == .joker) { col = 0; row = 2; } 
-    else { 
-        row = switch (card.suit) { .hearts => @as(f32, 0), .clubs => @as(f32, 1), .diamonds => @as(f32, 2), .spades => @as(f32, 3) };
+    var col: f32 = 0;
+    var row: f32 = 0;
+    if (card.rank == .joker) {
+        col = 0;
+        row = 2;
+    } else {
+        row = switch (card.suit) {
+            .hearts => @as(f32, 0),
+            .clubs => @as(f32, 1),
+            .diamonds => @as(f32, 2),
+            .spades => @as(f32, 3),
+        };
         const rank_val = @intFromEnum(card.rank);
-        if (card.rank == .ace) { col = 13; } else { col = @floatFromInt(rank_val - 1); }
+        if (card.rank == .ace) {
+            col = 13;
+        } else {
+            col = @floatFromInt(rank_val - 1);
+        }
     }
     rl.drawTexturePro(tex, .{ .x = col * sw, .y = row * sh, .width = sw, .height = sh }, .{ .x = @floatFromInt(x), .y = @floatFromInt(y), .width = CARD_W, .height = CARD_H }, .{ .x = 0, .y = 0 }, 0, .white);
 }
