@@ -25,6 +25,7 @@ const HAND_Y = 300;
 const ENEMY_DECK_POS = rl.Vector2{ .x = 20, .y = 20 };
 const PLAYER_DECK_POS = rl.Vector2{ .x = 20, .y = 300 };
 const DISCARD_POS = rl.Vector2{ .x = 700, .y = 300 };
+const REMOVED_POS = rl.Vector2{ .x = 700, .y = 150 };
 
 const ANIM_SPEED = 10.0;
 
@@ -131,6 +132,7 @@ fn spawnFlying(card: Card, start: rl.Vector2, end: rl.Vector2) void {
 }
 
 fn syncVisuals(action: ActionType) void {
+    // 1. Process Hand
     for (0..4) |i| {
         const x = @as(f32, @floatFromInt(HAND_X + @as(i32, @intCast(i)) * (CARD_W + SPACING)));
         const target = rl.Vector2{ .x = x, .y = HAND_Y };
@@ -138,22 +140,29 @@ fn syncVisuals(action: ActionType) void {
         if (global_state.hand[i]) |card| {
             if (hand_visuals[i]) |*v| {
                 if (!std.meta.eql(v.card, card)) {
-                    spawnFlying(v.card, v.pos, DISCARD_POS);
+                    // Card in slot changed. Previous one was discarded/captured.
+                    const end_pos = if (action == .capture) REMOVED_POS else DISCARD_POS;
+                    spawnFlying(v.card, v.pos, end_pos);
+                    // New card from player deck
                     v.* = VisualCard{ .card = card, .pos = PLAYER_DECK_POS, .target_pos = target, .active = true };
                 } else {
                     v.target_pos = target;
                 }
             } else {
+                // Was null, now has card
                 hand_visuals[i] = VisualCard{ .card = card, .pos = PLAYER_DECK_POS, .target_pos = target, .active = true };
             }
         } else {
+            // Now null. If it wasn't null before, it moved
             if (hand_visuals[i]) |v| {
-                spawnFlying(v.card, v.pos, DISCARD_POS);
+                const end_pos = if (action == .capture) REMOVED_POS else DISCARD_POS;
+                spawnFlying(v.card, v.pos, end_pos);
                 hand_visuals[i] = null;
             }
         }
     }
 
+    // 2. Process Field
     var old_field = field_visuals;
     for (0..4) |i| {
         const x = @as(f32, @floatFromInt(FIELD_X + @as(i32, @intCast(3 - i)) * (CARD_W + SPACING)));
@@ -186,9 +195,15 @@ fn syncVisuals(action: ActionType) void {
         }
     }
 
+    // Any cards left in old_field were removed from logical state
     for (old_field) |maybe_v| {
         if (maybe_v) |v| {
-            const end_pos = if (action == .delay) ENEMY_DECK_POS else DISCARD_POS;
+            var end_pos = DISCARD_POS;
+            if (action == .delay) {
+                end_pos = ENEMY_DECK_POS;
+            } else if (action == .capture) {
+                end_pos = REMOVED_POS;
+            }
             spawnFlying(v.card, v.pos, end_pos);
         }
     }
@@ -217,7 +232,6 @@ fn processInput() void {
             const rect = rl.Rectangle{ .x = x, .y = FIELD_Y, .width = CARD_W, .height = CARD_H };
             if (rl.checkCollisionPointRec(mouse, rect)) {
                 if (global_state.field[i]) |_| {
-                    // Try to capture immediately if any hand cards are selected
                     var h_indices: [4]usize = undefined;
                     var count: usize = 0;
                     for (selected_hand, 0..) |sel, j| if (sel) { h_indices[count] = j; count += 1; };
@@ -233,7 +247,6 @@ fn processInput() void {
                         } else |_| {}
                     }
                     
-                    // Fallback to normal selection
                     if (selected_field == i) {
                         selected_field = null;
                     } else {
@@ -318,6 +331,7 @@ export fn updateDrawFrame() void {
     const dt = rl.getFrameTime();
     processInput();
 
+    // Update animations
     for (&field_visuals) |*maybe_v| if (maybe_v.*) |*v| v.lerp(dt);
     for (&hand_visuals) |*maybe_v| if (maybe_v.*) |*v| v.lerp(dt);
     for (&flying_visuals) |*maybe_v| {
@@ -337,30 +351,35 @@ export fn updateDrawFrame() void {
         return;
     }
 
+    // Slots
     for (0..4) |i| drawSlot(@as(i32, @intFromFloat(FIELD_X)) + @as(i32, @intCast(3 - i)) * (CARD_W + SPACING), @intFromFloat(FIELD_Y));
     for (0..4) |i| drawSlot(@as(i32, @intFromFloat(HAND_X)) + @as(i32, @intCast(i)) * (CARD_W + SPACING), @intFromFloat(HAND_Y));
 
+    // Cards
     for (field_visuals, 0..) |maybe_v, i| if (maybe_v) |v| {
-        drawCard(card_texture, @intFromFloat(v.pos.x), @intFromFloat(v.pos.y), v.card);
+        drawCard(card_texture, @as(i32, @intFromFloat(v.pos.x)), @as(i32, @intFromFloat(v.pos.y)), v.card);
         if (selected_field == i) rl.drawRectangleLinesEx(.{ .x = v.pos.x, .y = v.pos.y, .width = CARD_W, .height = CARD_H }, 3, .yellow);
     };
     for (hand_visuals, 0..) |maybe_v, i| if (maybe_v) |v| {
-        drawCard(card_texture, @intFromFloat(v.pos.x), @intFromFloat(v.pos.y), v.card);
+        drawCard(card_texture, @as(i32, @intFromFloat(v.pos.x)), @as(i32, @intFromFloat(v.pos.y)), v.card);
         if (selected_hand[i]) rl.drawRectangleLinesEx(.{ .x = v.pos.x, .y = v.pos.y, .width = CARD_W, .height = CARD_H }, 3, .yellow);
     };
-    for (flying_visuals) |maybe_v| if (maybe_v) |v| drawCard(card_texture, @intFromFloat(v.pos.x), @intFromFloat(v.pos.y), v.card);
+    for (flying_visuals) |maybe_v| if (maybe_v) |v| drawCard(card_texture, @as(i32, @intFromFloat(v.pos.x)), @as(i32, @intFromFloat(v.pos.y)), v.card);
 
+    // Decks & Piles
     if (global_state.enemy_deck.count() > 0) {
         drawCardBack(card_texture, @as(i32, @intFromFloat(ENEMY_DECK_POS.x)), @as(i32, @intFromFloat(ENEMY_DECK_POS.y)));
     } else {
         drawSlot(@as(i32, @intFromFloat(ENEMY_DECK_POS.x)), @as(i32, @intFromFloat(ENEMY_DECK_POS.y)));
     }
+    rl.drawText("Enemy Deck", @as(i32, @intFromFloat(ENEMY_DECK_POS.x)), @as(i32, @intFromFloat(ENEMY_DECK_POS.y)) + CARD_H + 5, 10, .light_gray);
     
     if (global_state.deck.count() > 0) {
         drawCardBack(card_texture, @as(i32, @intFromFloat(PLAYER_DECK_POS.x)), @as(i32, @intFromFloat(PLAYER_DECK_POS.y)));
     } else {
         drawSlot(@as(i32, @intFromFloat(PLAYER_DECK_POS.x)), @as(i32, @intFromFloat(PLAYER_DECK_POS.y)));
     }
+    rl.drawText("Your Deck", @as(i32, @intFromFloat(PLAYER_DECK_POS.x)), @as(i32, @intFromFloat(PLAYER_DECK_POS.y)) + CARD_H + 5, 10, .light_gray);
 
     if (global_state.discard_pile.count() > 0) {
         const top = global_state.discard_pile.cards[global_state.discard_pile.len - 1];
@@ -368,7 +387,17 @@ export fn updateDrawFrame() void {
     } else {
         drawSlot(@as(i32, @intFromFloat(DISCARD_POS.x)), @as(i32, @intFromFloat(DISCARD_POS.y)));
     }
+    rl.drawText("Discard", @as(i32, @intFromFloat(DISCARD_POS.x)), @as(i32, @intFromFloat(DISCARD_POS.y)) + CARD_H + 5, 10, .light_gray);
 
+    // Removed from Game Pile
+    if (global_state.captured_count > 0) {
+        drawCardBack(card_texture, @as(i32, @intFromFloat(REMOVED_POS.x)), @as(i32, @intFromFloat(REMOVED_POS.y)));
+    } else {
+        drawSlot(@as(i32, @intFromFloat(REMOVED_POS.x)), @as(i32, @intFromFloat(REMOVED_POS.y)));
+    }
+    rl.drawText("Removed", @as(i32, @intFromFloat(REMOVED_POS.x)), @as(i32, @intFromFloat(REMOVED_POS.y)) + CARD_H + 5, 10, .light_gray);
+
+    // UI
     if (global_state.phase == .action) {
         drawButton(650, 100, 120, 40, "SACRIFICE", .orange);
         drawButton(650, 150, 120, 40, "DELAY", .dark_blue);
