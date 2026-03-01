@@ -23,6 +23,12 @@ const FIELD_Y = 60;
 const HAND_X = 110;
 const HAND_Y = 210;
 
+// Buttons.
+const BTN_HEIGHT = 30;
+const BTN_WIDTH = 100;
+const HELP_BTN_WIDTH = 80;
+const BTN_Y = 360;
+
 const ENEMY_DECK_POS = rl.Vector2{ .x = 15, .y = 60 };
 const PLAYER_DECK_POS = rl.Vector2{ .x = 15, .y = 210 };
 const DISCARD_POS = rl.Vector2{ .x = 505, .y = 210 };
@@ -281,7 +287,7 @@ fn processInput() void {
             return;
         }
 
-        if (rl.checkCollisionPointRec(mouse, .{ .x = SCREEN_WIDTH - 110, .y = 10, .width = 100, .height = 30 })) {
+        if (rl.checkCollisionPointRec(mouse, .{ .x = SCREEN_WIDTH - 110, .y = BTN_Y, .width = HELP_BTN_WIDTH, .height = BTN_HEIGHT })) {
             tutorial_active = true;
             current_step = 0;
             return;
@@ -487,9 +493,6 @@ export fn updateDrawFrame() void {
     rl.drawText("Removed", @as(i32, @intFromFloat(REMOVED_POS.x)), @as(i32, @intFromFloat(REMOVED_POS.y)) + CARD_H + 5, 10, .light_gray);
 
     // UI
-    const BTN_HEIGHT = 30;
-    const BTN_WIDTH = 100;
-    const BTN_Y = 360;
     if (global_state.phase == .action) {
         drawButton(190, BTN_Y, BTN_WIDTH, BTN_HEIGHT, "SACRIFICE", .orange);
         drawButton(310, BTN_Y, BTN_WIDTH, BTN_HEIGHT, "DELAY", .dark_blue);
@@ -500,7 +503,6 @@ export fn updateDrawFrame() void {
         drawButton(250, 250, 100, 30, "PLAY AGAIN", .dark_gray);
     }
 
-    const HELP_BTN_WIDTH = 80;
     drawButton(SCREEN_WIDTH - (HELP_BTN_WIDTH + 10), BTN_Y, HELP_BTN_WIDTH, 30, "HELP", .dark_gray);
 
     // Tutorial Overlay
