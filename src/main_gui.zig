@@ -22,6 +22,32 @@ const FIELD_Y = 150;
 const HAND_X = 210;
 const HAND_Y = 300;
 
+const ANIM_SPEED = 8.0; // Lerp factor per frame
+
+// Visual representation of a card for animation
+const VisualCard = struct {
+    card: Card,
+    pos: rl.Vector2,
+    target_pos: rl.Vector2,
+    active: bool = false,
+
+    fn lerp(self: *VisualCard, dt: f32) void {
+        if (!self.active) return;
+        const dx = self.target_pos.x - self.pos.x;
+        const dy = self.target_pos.y - self.pos.y;
+        
+        const adx = if (dx < 0) -dx else dx;
+        const ady = if (dy < 0) -dy else dy;
+
+        if (adx < 0.5 and ady < 0.5) {
+            self.pos = self.target_pos;
+        } else {
+            self.pos.x += dx * dt * ANIM_SPEED;
+            self.pos.y += dy * dt * ANIM_SPEED;
+        }
+    }
+};
+
 // GLOBALS
 var gpa_instance = std.heap.GeneralPurposeAllocator(.{ .stack_trace_frames = 0 }){};
 var prng_instance: std.Random.DefaultPrng = undefined;
@@ -33,6 +59,9 @@ var is_initialized: bool = false;
 var selected_hand: [4]bool = [_]bool{false} ** 4;
 var selected_field: ?usize = null;
 var status_message: [128:0]u8 = [_:0]u8{0} ** 128;
+
+// Animation State
+var field_visuals: [4]?VisualCard = [_]?VisualCard{null} ** 4;
 
 pub fn main() !void {
     const allocator = if (builtin.os.tag == .emscripten)
@@ -48,6 +77,7 @@ pub fn main() !void {
     card_texture = try rl.loadTexture("assets/cards.png");
 
     global_state = try GameState.init(allocator, random);
+    syncVisuals();
     is_initialized = true;
     _ = std.fmt.bufPrintZ(&status_message, "Welcome! Select cards and choose an action.", .{}) catch unreachable;
 
@@ -69,13 +99,75 @@ pub fn main() !void {
     }
 }
 
+// Synchronize visual positions with logical state
+// New cards start at the enemy deck position (20, 20)
+fn syncVisuals() void {
+    const enemy_deck_pos = rl.Vector2{ .x = 20, .y = 20 };
+
+    for (0..4) |i| {
+        const x = @as(f32, @floatFromInt(FIELD_X + @as(i32, @intCast(3 - i)) * (CARD_W + SPACING)));
+        const target = rl.Vector2{ .x = x, .y = FIELD_Y };
+
+        if (global_state.field[i]) |card| {
+            if (field_visuals[i]) |*v| {
+                if (!std.meta.eql(v.card, card)) {
+                    var found = false;
+                    for (0..4) |prev_i| {
+                        if (field_visuals[prev_i]) |prev_v| {
+                            if (std.meta.eql(prev_v.card, card)) {
+                                v.* = prev_v;
+                                v.target_pos = target;
+                                field_visuals[prev_i] = null;
+                                found = true;
+                                break;
+                            }
+                        }
+                    }
+                    if (!found) {
+                        v.* = VisualCard{
+                            .card = card,
+                            .pos = enemy_deck_pos,
+                            .target_pos = target,
+                            .active = true,
+                        };
+                    }
+                } else {
+                    v.target_pos = target;
+                }
+            } else {
+                var found = false;
+                for (0..4) |prev_i| {
+                    if (field_visuals[prev_i]) |prev_v| {
+                        if (std.meta.eql(prev_v.card, card)) {
+                            field_visuals[i] = prev_v;
+                            field_visuals[i].?.target_pos = target;
+                            field_visuals[prev_i] = null;
+                            found = true;
+                            break;
+                        }
+                    }
+                }
+                if (!found) {
+                    field_visuals[i] = VisualCard{
+                        .card = card,
+                        .pos = enemy_deck_pos,
+                        .target_pos = target,
+                        .active = true,
+                    };
+                }
+            }
+        } else {
+            field_visuals[i] = null;
+        }
+    }
+}
+
 fn processInput() void {
     if (!is_initialized or global_state.phase == .game_over) return;
 
     if (rl.isMouseButtonPressed(.left)) {
         const mouse = rl.getMousePosition();
 
-        // Check Hand Clicks
         for (0..4) |i| {
             const x = @as(f32, @floatFromInt(HAND_X + @as(i32, @intCast(i)) * (CARD_W + SPACING)));
             const rect = rl.Rectangle{ .x = x, .y = HAND_Y, .width = CARD_W, .height = CARD_H };
@@ -86,9 +178,7 @@ fn processInput() void {
             }
         }
 
-        // Check Field Clicks
         for (0..4) |i| {
-            // Index 0 is rightmost (3-i)
             const x = @as(f32, @floatFromInt(FIELD_X + @as(i32, @intCast(3 - i)) * (CARD_W + SPACING)));
             const rect = rl.Rectangle{ .x = x, .y = FIELD_Y, .width = CARD_W, .height = CARD_H };
             if (rl.checkCollisionPointRec(mouse, rect)) {
@@ -102,24 +192,23 @@ fn processInput() void {
             }
         }
 
-        // Action Buttons
         if (global_state.phase == .action) {
-            // Capture Button
             if (rl.checkCollisionPointRec(mouse, .{ .x = 650, .y = 50, .width = 120, .height = 40 })) {
                 handleCapture();
+                syncVisuals();
             }
-            // Sacrifice Button
             if (rl.checkCollisionPointRec(mouse, .{ .x = 650, .y = 100, .width = 120, .height = 40 })) {
                 handleSacrifice();
+                syncVisuals();
             }
-            // Delay Button
             if (rl.checkCollisionPointRec(mouse, .{ .x = 650, .y = 150, .width = 120, .height = 40 })) {
                 handleDelay();
+                syncVisuals();
             }
         } else if (global_state.phase == .discard) {
-            // Confirm Discard Button
             if (rl.checkCollisionPointRec(mouse, .{ .x = 650, .y = 50, .width = 120, .height = 40 })) {
                 handleDiscard();
+                syncVisuals();
             }
         }
     }
@@ -226,7 +315,14 @@ fn resetSelection() void {
 }
 
 export fn updateDrawFrame() void {
+    const dt = rl.getFrameTime();
     processInput();
+
+    for (&field_visuals) |*maybe_v| {
+        if (maybe_v.*) |*v| {
+            v.lerp(dt);
+        }
+    }
 
     rl.beginDrawing();
     defer rl.endDrawing();
@@ -238,20 +334,20 @@ export fn updateDrawFrame() void {
         return;
     }
 
-    // Draw field
-    for (global_state.field, 0..) |maybe_card, i| {
-        // Index 0 is rightmost (3-i)
+    for (0..4) |i| {
         const x = FIELD_X + @as(i32, @intCast(3 - i)) * (CARD_W + SPACING);
         drawSlot(x, FIELD_Y);
-        if (maybe_card) |card| {
-            drawCard(card_texture, x, FIELD_Y, card);
+    }
+
+    for (field_visuals, 0..) |maybe_v, i| {
+        if (maybe_v) |v| {
+            drawCard(card_texture, @as(i32, @intFromFloat(v.pos.x)), @as(i32, @intFromFloat(v.pos.y)), v.card);
             if (selected_field == i) {
-                rl.drawRectangleLinesEx(.{ .x = @floatFromInt(x), .y = FIELD_Y, .width = CARD_W, .height = CARD_H }, 3, .yellow);
+                rl.drawRectangleLinesEx(.{ .x = v.pos.x, .y = v.pos.y, .width = CARD_W, .height = CARD_H }, 3, .yellow);
             }
         }
     }
 
-    // Draw hand
     for (global_state.hand, 0..) |maybe_card, i| {
         const x = HAND_X + @as(i32, @intCast(i)) * (CARD_W + SPACING);
         drawSlot(x, HAND_Y);
@@ -263,7 +359,6 @@ export fn updateDrawFrame() void {
         }
     }
 
-    // Decks
     if (global_state.enemy_deck.count() > 0) {
         drawCardBack(card_texture, 20, 20);
     } else {
@@ -278,7 +373,6 @@ export fn updateDrawFrame() void {
     }
     rl.drawText("Your Deck", 20, 300 + CARD_H + 5, 10, .light_gray);
 
-    // Discard
     const discard_x = 700;
     const discard_y = 300;
     if (global_state.discard_pile.count() > 0) {
@@ -289,7 +383,6 @@ export fn updateDrawFrame() void {
     }
     rl.drawText("Discard", discard_x, discard_y + CARD_H + 5, 10, .light_gray);
 
-    // Buttons
     if (global_state.phase == .action) {
         drawButton(650, 50, 120, 40, "CAPTURE", .maroon);
         drawButton(650, 100, 120, 40, "SACRIFICE", .orange);
@@ -300,7 +393,6 @@ export fn updateDrawFrame() void {
         rl.drawText("GAME OVER", 300, 200, 40, .red);
     }
 
-    // Status & UI
     rl.drawText(&status_message, 210, 420, 20, .ray_white);
     
     var buf: [64]u8 = undefined;
