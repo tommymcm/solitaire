@@ -240,11 +240,16 @@ pub const GameState = struct {
 
     /// Refills the field from the enemy deck.
     pub fn drawNextEnemy(self: *GameState) !void {
-        // March existing field forward.
+        // March existing field forward to make room at the back
         self.marchField();
 
-        // Draw a new card to the field.
-        self.field[3] = self.enemy_deck.draw();
+        // Draw a new card to the field if there's room at the back
+        if (self.field[3] == null) {
+            self.field[3] = self.enemy_deck.draw();
+        }
+
+        // March again to move the newly drawn card as far forward as possible
+        self.marchField();
     }
 
     pub fn playCapture(self: *GameState, hand_indices: []const usize, field_idx: usize, joker_mimic: ?Card) !bool {
