@@ -14,8 +14,27 @@ const CARD_W = 80;
 const CARD_H = 110;
 const SPACING = 20;
 
+// New spritesheet info: 14 columns, 4 rows
+// Card size in sheet: 71x95
 const SHEET_COLS = 14;
 const SHEET_ROWS = 4;
+
+// GLOBALS
+var gpa_instance = std.heap.GeneralPurposeAllocator(.{ .stack_trace_frames = 0 }){};
+var prng_instance: std.Random.DefaultPrng = undefined;
+var global_state: GameState = undefined;
+var card_texture: rl.Texture2D = undefined;
+var is_initialized: bool = false;
+
+// Selection State
+var selected_hand: [4]bool = [_]bool{false} ** 4;
+var selected_field: ?usize = null;
+var status_message: [128:0]u8 = [_:0]u8{0} ** 128;
+
+// Animation State
+var field_visuals: [4]?VisualCard = [_]?VisualCard{null} ** 4;
+var hand_visuals: [4]?VisualCard = [_]?VisualCard{null} ** 4;
+var flying_visuals: [16]?VisualCard = [_]?VisualCard{null} ** 16;
 
 const FIELD_X = 210;
 const FIELD_Y = 150;
@@ -59,23 +78,6 @@ const VisualCard = struct {
     }
 };
 
-// GLOBALS
-var gpa_instance = std.heap.GeneralPurposeAllocator(.{ .stack_trace_frames = 0 }){};
-var prng_instance: std.Random.DefaultPrng = undefined;
-var global_state: GameState = undefined;
-var card_texture: rl.Texture2D = undefined;
-var is_initialized: bool = false;
-
-// Selection State
-var selected_hand: [4]bool = [_]bool{false} ** 4;
-var selected_field: ?usize = null;
-var status_message: [128:0]u8 = [_:0]u8{0} ** 128;
-
-// Animation State
-var field_visuals: [4]?VisualCard = [_]?VisualCard{null} ** 4;
-var hand_visuals: [4]?VisualCard = [_]?VisualCard{null} ** 4;
-var flying_visuals: [16]?VisualCard = [_]?VisualCard{null} ** 16;
-
 pub fn main() !void {
     const allocator = if (builtin.os.tag == .emscripten)
         std.heap.wasm_allocator
@@ -84,7 +86,6 @@ pub fn main() !void {
 
     rl.initWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Card Capture");
     
-    // Seed PRNG with true entropy
     var seed: u64 = undefined;
     try std.posix.getrandom(std.mem.asBytes(&seed));
     prng_instance = std.Random.DefaultPrng.init(seed);
@@ -132,7 +133,6 @@ fn spawnFlying(card: Card, start: rl.Vector2, end: rl.Vector2) void {
 }
 
 fn syncVisuals(action: ActionType) void {
-    // 1. Process Hand
     for (0..4) |i| {
         const x = @as(f32, @floatFromInt(HAND_X + @as(i32, @intCast(i)) * (CARD_W + SPACING)));
         const target = rl.Vector2{ .x = x, .y = HAND_Y };
@@ -156,9 +156,7 @@ fn syncVisuals(action: ActionType) void {
         }
     }
 
-    // 2. Process Field
     var old_field = field_visuals;
-    
     for (0..4) |i| {
         const x = @as(f32, @floatFromInt(FIELD_X + @as(i32, @intCast(3 - i)) * (CARD_W + SPACING)));
         const target = rl.Vector2{ .x = x, .y = FIELD_Y };
@@ -343,9 +341,11 @@ export fn updateDrawFrame() void {
         return;
     }
 
+    // Slots
     for (0..4) |i| drawSlot(@as(i32, @intFromFloat(FIELD_X)) + @as(i32, @intCast(3 - i)) * (CARD_W + SPACING), @intFromFloat(FIELD_Y));
     for (0..4) |i| drawSlot(@as(i32, @intFromFloat(HAND_X)) + @as(i32, @intCast(i)) * (CARD_W + SPACING), @intFromFloat(HAND_Y));
 
+    // Cards
     for (field_visuals, 0..) |maybe_v, i| if (maybe_v) |v| {
         drawCard(card_texture, @intFromFloat(v.pos.x), @intFromFloat(v.pos.y), v.card);
         if (selected_field == i) rl.drawRectangleLinesEx(.{ .x = v.pos.x, .y = v.pos.y, .width = CARD_W, .height = CARD_H }, 3, .yellow);
@@ -375,6 +375,7 @@ export fn updateDrawFrame() void {
         drawSlot(@as(i32, @intFromFloat(DISCARD_POS.x)), @as(i32, @intFromFloat(DISCARD_POS.y)));
     }
 
+    // UI
     if (global_state.phase == .action) {
         drawButton(650, 50, 120, 40, "CAPTURE", .maroon);
         drawButton(650, 100, 120, 40, "SACRIFICE", .orange);
@@ -400,14 +401,53 @@ fn drawSlot(x: i32, y: i32) void { rl.drawRectangleLines(x, y, CARD_W, CARD_H, .
 fn drawCard(tex: rl.Texture2D, x: i32, y: i32, card: Card) void {
     const sw = @as(f32, @floatFromInt(tex.width)) / SHEET_COLS;
     const sh = @as(f32, @floatFromInt(tex.height)) / SHEET_ROWS;
+
     var col: f32 = 0; var row: f32 = 0;
-    if (card.rank == .joker) { col = 0; row = 1; } 
-    else { col = @floatFromInt(@intFromEnum(card.rank)); row = switch (card.suit) { .spades => 0, .hearts => 1, .clubs => 2, .diamonds => 3 }; }
-    rl.drawTexturePro(tex, .{ .x = col * sw, .y = row * sh, .width = sw, .height = sh }, .{ .x = @floatFromInt(x), .y = @floatFromInt(y), .width = CARD_W, .height = CARD_H }, .{ .x = 0, .y = 0 }, 0, .white);
+    if (card.rank == .joker) { 
+        col = 0; row = 2; // Joker is Col 0, Row 2
+    } else { 
+        // Rows: Hearts (0), Clubs (1), Diamonds (2), Spades (3)
+        row = switch (card.suit) {
+            .hearts => @as(f32, 0),
+            .clubs => @as(f32, 1),
+            .diamonds => @as(f32, 2),
+            .spades => @as(f32, 3),
+        };
+        
+        // Columns: 2-10 are 1-9, J is 10, Q is 11, K is 12, A is 13
+        const rank_val = @intFromEnum(card.rank);
+        col = switch (card.rank) {
+            .ace => @as(f32, 13),
+            else => @floatFromInt(rank_val), // 2 is index 2, but in sheet 2 is col 1
+        };
+        // Wait, rank enum mapping: joker=0, ace=1, two=2...
+        // If 2 is Col 1, then col = rank_val - 1 for 2-10,J,Q,K
+        // Let's re-verify rank enum: ace is 1. If Ace is col 13, then:
+        if (card.rank == .ace) {
+            col = 13;
+        } else {
+            // rank two (2) -> col 1
+            // rank ten (10) -> col 9
+            // rank jack (11) -> col 10
+            // rank king (13) -> col 12
+            col = @floatFromInt(rank_val - 1);
+        }
+    }
+    
+    rl.drawTexturePro(tex, 
+        .{ .x = col * sw, .y = row * sh, .width = sw, .height = sh }, 
+        .{ .x = @floatFromInt(x), .y = @floatFromInt(y), .width = CARD_W, .height = CARD_H }, 
+        .{ .x = 0, .y = 0 }, 0, .white
+    );
 }
 
 fn drawCardBack(tex: rl.Texture2D, x: i32, y: i32) void {
     const sw = @as(f32, @floatFromInt(tex.width)) / SHEET_COLS;
     const sh = @as(f32, @floatFromInt(tex.height)) / SHEET_ROWS;
-    rl.drawTexturePro(tex, .{ .x = 0, .y = 0, .width = sw, .height = sh }, .{ .x = @floatFromInt(x), .y = @floatFromInt(y), .width = CARD_W, .height = CARD_H }, .{ .x = 0, .y = 0 }, 0, .white);
+    // Card back is at (0, 0)
+    rl.drawTexturePro(tex, 
+        .{ .x = 0, .y = 0, .width = sw, .height = sh }, 
+        .{ .x = @floatFromInt(x), .y = @floatFromInt(y), .width = CARD_W, .height = CARD_H }, 
+        .{ .x = 0, .y = 0 }, 0, .white
+    );
 }
