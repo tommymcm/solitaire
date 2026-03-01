@@ -73,15 +73,16 @@ const TutorialStep = struct {
 };
 
 const tutorial_steps = [_]TutorialStep{
-    .{ .text = "Welcome to Card Capture! Click Next to learn the basics." },
-    .{ .text = "This is the Enemy Deck. It contains cards you must capture to win.", .highlight = .{ .x = 10, .y = 55, .width = CARD_W + 10, .height = CARD_H + 30 } },
-    .{ .text = "This is the Field. Opponent cards move here. You want to clear these!", .highlight = .{ .x = FIELD_X - 10, .y = FIELD_Y - 10, .width = (CARD_W + SPACING) * 4, .height = CARD_H + 20 } },
-    .{ .text = "This is your Hand. You use these cards to interact with the field.", .highlight = .{ .x = HAND_X - 10, .y = HAND_Y - 10, .width = (CARD_W + SPACING) * 4, .height = CARD_H + 20 } },
-    .{ .text = "To CAPTURE: Select cards in hand that match the field card's SUIT and sum to its VALUE, then click the field card.", .highlight = .{ .x = FIELD_X - 10, .y = FIELD_Y - 10, .width = (CARD_W + SPACING) * 4, .height = CARD_H + 150 } },
+    .{ .text = "Welcome to CARD CAPTURE! Click Next to learn the basics." },
+    .{ .text = "This is the ENEMY DECK. It contains cards you must capture to win.", .highlight = .{ .x = 10, .y = 55, .width = CARD_W + 10, .height = CARD_H + 30 } },
+    .{ .text = "This is the FIELD. Opponent cards move here from left to right. Your goal is to clear these!", .highlight = .{ .x = FIELD_X - 10, .y = FIELD_Y - 10, .width = (CARD_W + SPACING) * 4, .height = CARD_H + 20 } },
+    .{ .text = "This is your HAND. You use these cards to interact with the field.", .highlight = .{ .x = HAND_X - 10, .y = HAND_Y - 10, .width = (CARD_W + SPACING) * 4, .height = CARD_H + 20 } },
+    .{ .text = "To CAPTURE: Select cards in hand that match a field card's SUIT, with a sum greater than or equal to its VALUE, then click the field card.", .highlight = .{ .x = FIELD_X - 10, .y = FIELD_Y - 10, .width = (CARD_W + SPACING) * 4, .height = CARD_H + 150 } },
+    .{ .text = "NOTE: Jokers MIMIC the highest VALUE card in your hand of the matching SUIT.", .highlight = .{ .x = FIELD_X - 10, .y = FIELD_Y - 10, .width = (CARD_W + SPACING) * 4, .height = CARD_H + 150 } },
     .{ .text = "To SACRIFICE: Select ONE hand card and click this. Both it and the rightmost field card are REMOVED forever.", .highlight = .{ .x = 190, .y = 355, .width = 110, .height = 40 } },
-    .{ .text = "To DELAY: Select TWO hand cards and click this. They are REMOVED, and the field card goes back to the deck.", .highlight = .{ .x = 305, .y = 355, .width = 110, .height = 40 } },
+    .{ .text = "To DELAY: Select TWO hand cards to REMOVE, the rightmost field card goes to the bottom of the ENEMY DECK.", .highlight = .{ .x = 305, .y = 355, .width = 110, .height = 40 } },
     .{
-        .text = "Goal: Capture all cards! If you lose a Face Card (A, J, Q, K) via sacrifice, you lose immediately.",
+        .text = "Goal: Capture all FACE CARDS (A, J, Q, K)! If FACE CARD is removed, you lose immediately.",
     },
 };
 
