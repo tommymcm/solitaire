@@ -98,6 +98,9 @@ const TutorialStep = struct {
     box_pos: TutBoxPos = .center,
 };
 
+const HL_FIELD_OFFSET = 10;
+const HL_FIELD_WIDTH = CARD_W * 4 + CARD_SPACING * 3 + HL_FIELD_OFFSET * 2;
+const HL_FIELD_HEIGHT = CARD_H + HL_FIELD_OFFSET * 2;
 const tutorial_steps = [_]TutorialStep{
     .{ .text = "Welcome to CARD CAPTURE! Click Next to learn the basics." },
     .{
@@ -107,17 +110,17 @@ const tutorial_steps = [_]TutorialStep{
     },
     .{
         .text = "This is the FIELD. Your goal is to CAPTURE or REMOVE these.",
-        .highlight = .{ .x = FIELD_X - 10, .y = FIELD_Y - 10, .width = (CARD_W + CARD_SPACING) * 4, .height = CARD_H + 20 },
+        .highlight = .{ .x = FIELD_X - 10, .y = FIELD_Y - 10, .width = HL_FIELD_WIDTH, .height = HL_FIELD_HEIGHT },
         .box_pos = .bottom,
     },
     .{
         .text = "This is your HAND. You use these cards to interact with the field.",
-        .highlight = .{ .x = HAND_X - 10, .y = HAND_Y - 10, .width = (CARD_W + CARD_SPACING) * 4, .height = CARD_H + 20 },
+        .highlight = .{ .x = HAND_X - 10, .y = HAND_Y - 10, .width = HL_FIELD_WIDTH, .height = HL_FIELD_HEIGHT },
         .box_pos = .top,
     },
     .{
         .text = "At the start of your TURN, you may DISCARD any number of cards.",
-        .highlight = .{ .x = HAND_X - 10, .y = HAND_Y - 10, .width = (CARD_W + CARD_SPACING) * 4, .height = CARD_H + 20 },
+        .highlight = .{ .x = HAND_X - 10, .y = HAND_Y - 10, .width = HL_FIELD_WIDTH, .height = HL_FIELD_HEIGHT },
         .box_pos = .top,
     },
     .{
@@ -135,7 +138,7 @@ const tutorial_steps = [_]TutorialStep{
     },
     .{
         .text = "To CAPTURE: Select cards with the same SUIT in your HAND. Then, select a field card of equal or lesser VALUE to CAPTURE.",
-        .highlight = .{ .x = FIELD_X - 10, .y = FIELD_Y - 10, .width = (CARD_W + CARD_SPACING) * 4, .height = (HAND_Y + CARD_H) - FIELD_Y + 20 },
+        .highlight = .{ .x = FIELD_X - 10, .y = FIELD_Y - 10, .width = HL_FIELD_WIDTH, .height = (HAND_Y + CARD_H) - FIELD_Y + 20 },
         .box_pos = .bottom,
     },
     .{
@@ -158,7 +161,7 @@ const tutorial_steps = [_]TutorialStep{
     },
     .{
         .text = "After your TURN, cards in the FIELD move to the RIGHT and a new card is drawn from the ENEMY DECK.",
-        .highlight = .{ .x = FIELD_X - 10, .y = FIELD_Y - 10, .width = (CARD_W + CARD_SPACING) * 4, .height = CARD_H + 20 },
+        .highlight = .{ .x = FIELD_X - 10, .y = FIELD_Y - 10, .width = HL_FIELD_WIDTH, .height = HL_FIELD_HEIGHT },
         .box_pos = .bottom,
     },
     .{
