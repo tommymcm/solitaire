@@ -44,6 +44,11 @@ const BTN_ROW_Y = HAND_Y + CARD_H + 30;
 const HELP_BTN_W = 80;
 const HELP_BTN_X = SCREEN_WIDTH - HELP_BTN_W - MARGIN_X;
 
+const FS_BTN_W = 100;
+const FS_BTN_H = 30;
+const FS_BTN_X = MARGIN_X;
+const FS_BTN_Y = BTN_ROW_Y;
+
 const SACRIFICE_BTN_X = (SCREEN_WIDTH - (BTN_W * 2 + BTN_SPACING)) / 2;
 const DELAY_BTN_X = SACRIFICE_BTN_X + BTN_W + BTN_SPACING;
 const CONFIRM_BTN_X = (SCREEN_WIDTH - BTN_W) / 2;
@@ -398,6 +403,12 @@ fn processInput() void {
             return;
         }
 
+        // Fullscreen Button
+        if (rl.checkCollisionPointRec(mouse, .{ .x = FS_BTN_X, .y = FS_BTN_Y, .width = FS_BTN_W, .height = FS_BTN_H })) {
+            rl.toggleFullscreen();
+            return;
+        }
+
         // Help Button
         if (rl.checkCollisionPointRec(mouse, .{ .x = HELP_BTN_X, .y = BTN_ROW_Y, .width = HELP_BTN_W, .height = BTN_H })) {
             tutorial_active = true;
@@ -628,6 +639,7 @@ export fn updateDrawFrame() void {
     }
 
     drawButton(HELP_BTN_X, BTN_ROW_Y, HELP_BTN_W, BTN_H, "HELP", .dark_gray);
+    drawButton(FS_BTN_X, FS_BTN_Y, FS_BTN_W, FS_BTN_H, "FULLSCREEN", .dark_gray);
 
     // Tutorial Overlay
     if (tutorial_active) {
