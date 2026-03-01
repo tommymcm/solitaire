@@ -52,7 +52,9 @@ const CONFIRM_BTN_X = (SCREEN_WIDTH - BTN_W) / 2;
 const TUT_BOX_W = 500;
 const TUT_BOX_H = 150;
 const TUT_BOX_X = (SCREEN_WIDTH - TUT_BOX_W) / 2;
-const TUT_BOX_Y = (SCREEN_HEIGHT - TUT_BOX_H) / 2;
+const TUT_BOX_Y_CENTER = (SCREEN_HEIGHT - TUT_BOX_H) / 2;
+const TUT_BOX_Y_TOP = 20;
+const TUT_BOX_Y_BOTTOM = SCREEN_HEIGHT - TUT_BOX_H - 20;
 const TUT_TEXT_MARGIN = 20;
 const TUT_BTN_W = 80;
 const TUT_BTN_H = 30;
@@ -88,9 +90,12 @@ const VisualCard = struct {
     }
 };
 
+const TutBoxPos = enum { top, center, bottom };
+
 const TutorialStep = struct {
     text: [:0]const u8,
     highlight: ?rl.Rectangle = null,
+    box_pos: TutBoxPos = .center,
 };
 
 const tutorial_steps = [_]TutorialStep{
@@ -98,37 +103,45 @@ const tutorial_steps = [_]TutorialStep{
     .{
         .text = "This is the ENEMY DECK. It contains cards you must CAPTURE to WIN!",
         .highlight = .{ .x = ENEMY_DECK_POS.x - 5, .y = ENEMY_DECK_POS.y - 5, .width = CARD_W + 10, .height = CARD_H + 30 },
+        .box_pos = .bottom,
     },
     .{
-        .text = "This is the FIELD. Your goal is to CAPTURE or REMOVE these cards.",
-        .highlight = .{ .x = FIELD_X - 10, .y = FIELD_Y - 10, .width = (CARD_W + CARD_SPACING) * 4, .height = CARD_H + 20 },
+        .text = "This is the FIELD. Your goal is to CAPTURE or REMOVE these.",
+        .highlight = .{ .x = FIELD_X - 10, .y = FIELD_Y - 10, .width = (CARD_W * 4) + (CARD_SPACING * 3) + 20, .height = CARD_H + 20 },
+        .box_pos = .bottom,
     },
     .{
         .text = "This is your HAND. You use these cards to interact with the field.",
-        .highlight = .{ .x = HAND_X - 10, .y = HAND_Y - 10, .width = (CARD_W + CARD_SPACING) * 4, .height = CARD_H + 20 },
+        .highlight = .{ .x = HAND_X - 10, .y = HAND_Y - 10, .width = (CARD_W * 4) + (CARD_SPACING * 3) + 20, .height = CARD_H + 20 },
+        .box_pos = .top,
     },
     .{
         .text = "At the start of your TURN, you may DISCARD any number of cards.",
-        .highlight = .{ .x = HAND_X - 10, .y = HAND_Y - 10, .width = (CARD_W + CARD_SPACING) * 4, .height = CARD_H + 20 },
+        .highlight = .{ .x = HAND_X - 10, .y = HAND_Y - 10, .width = (CARD_W * 4) + (CARD_SPACING * 3) + 20, .height = CARD_H + 20 },
+        .box_pos = .top,
     },
     .{
         .text = "Then, draw from your DECK until you have FOUR cards in your HAND.",
         .highlight = .{ .x = PLAYER_DECK_POS.x - 5, .y = PLAYER_DECK_POS.y - 5, .width = CARD_W + 10, .height = CARD_H + 30 },
+        .box_pos = .top,
     },
     .{
         .text = "If your DECK is empty, SHUFFLE your DISCARD PILE. It becomes your new DECK.",
         .highlight = .{ .x = DISCARD_POS.x - 5, .y = DISCARD_POS.y - 5, .width = CARD_W + 10, .height = CARD_H + 30 },
+        .box_pos = .top,
     },
     .{
         .text = "On your TURN, you may take ONE of three actions: CAPTURE, SACRIFICE, or DELAY.",
     },
     .{
         .text = "To CAPTURE: Select cards with the same SUIT in your HAND. Then, select a field card of equal or lesser VALUE to CAPTURE.",
-        .highlight = .{ .x = FIELD_X - 10, .y = FIELD_Y - 10, .width = (CARD_W + CARD_SPACING) * 4, .height = (HAND_Y + CARD_H) - FIELD_Y + 20 },
+        .highlight = .{ .x = FIELD_X - 10, .y = FIELD_Y - 10, .width = (CARD_W * 4) + (CARD_SPACING * 3) + 20, .height = (HAND_Y + CARD_H) - FIELD_Y + 20 },
+        .box_pos = .bottom,
     },
     .{
         .text = "Then, place the CAPTURED card and all cards used from your HAND in your DISCARD pile.",
         .highlight = .{ .x = DISCARD_POS.x - 5, .y = DISCARD_POS.y - 5, .width = CARD_W + 10, .height = CARD_H + 30 },
+        .box_pos = .top,
     },
     .{
         .text = "NOTE: Jokers MIMIC the highest VALUE card in your hand of the matching SUIT.",
@@ -136,14 +149,17 @@ const tutorial_steps = [_]TutorialStep{
     .{
         .text = "To SACRIFICE: Select ONE card from your hand. Both it and the rightmost field card are REMOVED forever.",
         .highlight = .{ .x = SACRIFICE_BTN_X - 5, .y = BTN_ROW_Y - 5, .width = BTN_W + 10, .height = BTN_H + 10 },
+        .box_pos = .top,
     },
     .{
         .text = "To DELAY: Select TWO cards from your hand to REMOVE, the rightmost field card goes to the bottom of the ENEMY DECK.",
         .highlight = .{ .x = DELAY_BTN_X - 5, .y = BTN_ROW_Y - 5, .width = BTN_W + 10, .height = BTN_H + 10 },
+        .box_pos = .top,
     },
     .{
         .text = "After your TURN, cards in the FIELD move to the RIGHT and a new card is drawn from the ENEMY DECK.",
-        .highlight = .{ .x = FIELD_X - 10, .y = FIELD_Y - 10, .width = (CARD_W + CARD_SPACING) * 4, .height = CARD_H + 20 },
+        .highlight = .{ .x = FIELD_X - 10, .y = FIELD_Y - 10, .width = (CARD_W * 4) + (CARD_SPACING * 3) + 20, .height = CARD_H + 20 },
+        .box_pos = .bottom,
     },
     .{
         .text = "To WIN: Capture all FACE CARDS (A, J, Q, K)! If a FACE CARD is REMOVED, you LOSE...",
@@ -330,6 +346,14 @@ fn syncVisuals(action: ActionType) void {
     }
 }
 
+fn getTutBoxY(pos: TutBoxPos) i32 {
+    return switch (pos) {
+        .top => TUT_BOX_Y_TOP,
+        .center => TUT_BOX_Y_CENTER,
+        .bottom => TUT_BOX_Y_BOTTOM,
+    };
+}
+
 fn processInput() void {
     if (!is_initialized) return;
 
@@ -339,26 +363,20 @@ fn processInput() void {
         // 0. Tutorial Input
         if (tutorial_active) {
             const step = tutorial_steps[current_step];
-            var box_y: f32 = TUT_BOX_Y;
-            if (step.highlight) |h| {
-                if (h.y < SCREEN_HEIGHT / 2) {
-                    box_y = SCREEN_HEIGHT - TUT_BOX_H - 20;
-                } else {
-                    box_y = 20;
-                }
-            }
+            const box_y = getTutBoxY(step.box_pos);
 
             const tut_next_x = TUT_BOX_X + TUT_BOX_W - TUT_BTN_W - TUT_TEXT_MARGIN;
             const tut_btn_y = box_y + TUT_BOX_H - TUT_BTN_H - TUT_TEXT_MARGIN;
+            const tut_close_x = TUT_BOX_X + TUT_TEXT_MARGIN;
 
-            if (rl.checkCollisionPointRec(mouse, .{ .x = tut_next_x, .y = tut_btn_y, .width = TUT_BTN_W, .height = TUT_BTN_H })) {
+            if (rl.checkCollisionPointRec(mouse, .{ .x = tut_next_x, .y = @floatFromInt(tut_btn_y), .width = TUT_BTN_W, .height = TUT_BTN_H })) {
                 current_step += 1;
                 if (current_step >= tutorial_steps.len) {
                     tutorial_active = false;
                     current_step = 0;
                 }
             }
-            if (rl.checkCollisionPointRec(mouse, .{ .x = TUT_BOX_X + TUT_TEXT_MARGIN, .y = tut_btn_y, .width = TUT_BTN_W, .height = TUT_BTN_H })) {
+            if (rl.checkCollisionPointRec(mouse, .{ .x = tut_close_x, .y = @floatFromInt(tut_btn_y), .width = TUT_BTN_W, .height = TUT_BTN_H })) {
                 tutorial_active = false;
                 current_step = 0;
             }
@@ -544,20 +562,19 @@ export fn updateDrawFrame() void {
     for (flying_visuals) |maybe_v| if (maybe_v) |v| drawCard(card_texture, @as(i32, @intFromFloat(v.pos.x)), @as(i32, @intFromFloat(v.pos.y)), v.card);
 
     // Decks & Piles
-    const label_size = 12;
     if (global_state.enemy_deck.count() > 0) {
         drawCardBack(card_texture, @as(i32, @intFromFloat(ENEMY_DECK_POS.x)), @as(i32, @intFromFloat(ENEMY_DECK_POS.y)));
     } else drawSlot(@as(i32, @intFromFloat(ENEMY_DECK_POS.x)), @as(i32, @intFromFloat(ENEMY_DECK_POS.y)));
     var enemy_label_buf: [32]u8 = undefined;
     const enemy_label = std.fmt.bufPrintZ(&enemy_label_buf, "Enemy: {d}", .{global_state.enemy_deck.count()}) catch "Enemy";
-    rl.drawText(enemy_label, @as(i32, @intFromFloat(ENEMY_DECK_POS.x)), @as(i32, @intFromFloat(ENEMY_DECK_POS.y)) + CARD_H + label_size / 2, label_size, .light_gray);
+    rl.drawText(enemy_label, @as(i32, @intFromFloat(ENEMY_DECK_POS.x)), @as(i32, @intFromFloat(ENEMY_DECK_POS.y)) + CARD_H + 5, 10, .light_gray);
 
     if (global_state.deck.count() > 0) {
         drawCardBack(card_texture, @as(i32, @intFromFloat(PLAYER_DECK_POS.x)), @as(i32, @intFromFloat(PLAYER_DECK_POS.y)));
     } else drawSlot(@as(i32, @intFromFloat(PLAYER_DECK_POS.x)), @as(i32, @intFromFloat(PLAYER_DECK_POS.y)));
     var player_label_buf: [32]u8 = undefined;
     const player_label = std.fmt.bufPrintZ(&player_label_buf, "Deck: {d}", .{global_state.deck.count()}) catch "Deck";
-    rl.drawText(player_label, @as(i32, @intFromFloat(PLAYER_DECK_POS.x)), @as(i32, @intFromFloat(PLAYER_DECK_POS.y)) + CARD_H + label_size / 2, label_size, .light_gray);
+    rl.drawText(player_label, @as(i32, @intFromFloat(PLAYER_DECK_POS.x)), @as(i32, @intFromFloat(PLAYER_DECK_POS.y)) + CARD_H + 5, 10, .light_gray);
 
     if (global_state.discard_pile.count() > 0) {
         const top = global_state.discard_pile.cards[global_state.discard_pile.len - 1];
@@ -565,10 +582,10 @@ export fn updateDrawFrame() void {
     } else drawSlot(@as(i32, @intFromFloat(DISCARD_POS.x)), @as(i32, @intFromFloat(DISCARD_POS.y)));
     var discard_label_buf: [32]u8 = undefined;
     const discard_label = std.fmt.bufPrintZ(&discard_label_buf, "Discard: {d}", .{global_state.discard_pile.count()}) catch "Discard";
-    rl.drawText(discard_label, @as(i32, @intFromFloat(DISCARD_POS.x)), @as(i32, @intFromFloat(DISCARD_POS.y)) + CARD_H + label_size / 2, label_size, .light_gray);
+    rl.drawText(discard_label, @as(i32, @intFromFloat(DISCARD_POS.x)), @as(i32, @intFromFloat(DISCARD_POS.y)) + CARD_H + 5, 10, .light_gray);
 
     if (removed_count > 0) drawCardBack(card_texture, @as(i32, @intFromFloat(REMOVED_POS.x)), @as(i32, @intFromFloat(REMOVED_POS.y))) else drawSlot(@as(i32, @intFromFloat(REMOVED_POS.x)), @as(i32, @intFromFloat(REMOVED_POS.y)));
-    rl.drawText("Removed", @as(i32, @intFromFloat(REMOVED_POS.x)), @as(i32, @intFromFloat(REMOVED_POS.y)) + CARD_H + label_size / 2, label_size, .light_gray);
+    rl.drawText("Removed", @as(i32, @intFromFloat(REMOVED_POS.x)), @as(i32, @intFromFloat(REMOVED_POS.y)) + CARD_H + 5, 10, .light_gray);
 
     // UI
     if (global_state.phase == .action) {
@@ -584,6 +601,11 @@ export fn updateDrawFrame() void {
     }
 
     drawButton(HELP_BTN_X, BTN_ROW_Y, HELP_BTN_W, BTN_H, "HELP", .dark_gray);
+
+    if (global_state.phase != .game_over) {
+        const sw_msg = rl.measureText(&status_message, 20);
+        rl.drawText(&status_message, @divTrunc(SCREEN_WIDTH - sw_msg, 2), 15, 20, .ray_white);
+    }
 
     // Tutorial Overlay
     if (tutorial_active) {
@@ -607,24 +629,14 @@ export fn updateDrawFrame() void {
             rl.drawRectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, dim_color);
         }
 
-        var box_y: f32 = TUT_BOX_Y;
-        if (step.highlight) |h| {
-            // If highlight is in the top half, move box to bottom
-            if (h.y < SCREEN_HEIGHT / 2) {
-                box_y = SCREEN_HEIGHT - TUT_BOX_H - 20;
-            } else {
-                // If highlight is in bottom half, move box to top
-                box_y = 20;
-            }
-        }
-
-        const box_rect = rl.Rectangle{ .x = TUT_BOX_X, .y = box_y, .width = TUT_BOX_W, .height = TUT_BOX_H };
+        const box_y = getTutBoxY(step.box_pos);
+        const box_rect = rl.Rectangle{ .x = TUT_BOX_X, .y = @floatFromInt(box_y), .width = TUT_BOX_W, .height = TUT_BOX_H };
         rl.drawRectangleRec(box_rect, .dark_gray);
         rl.drawRectangleLinesEx(box_rect, 2, .ray_white);
 
-        drawTextWrapped(step.text, @as(i32, @intFromFloat(TUT_BOX_X)) + TUT_TEXT_MARGIN, @as(i32, @intFromFloat(box_y)) + TUT_TEXT_MARGIN, TUT_BOX_W - (TUT_TEXT_MARGIN * 2), 20, .ray_white);
+        drawTextWrapped(step.text, @as(i32, @intFromFloat(TUT_BOX_X)) + TUT_TEXT_MARGIN, box_y + TUT_TEXT_MARGIN, TUT_BOX_W - (TUT_TEXT_MARGIN * 2), 20, .ray_white);
 
-        const tut_btn_y = @as(i32, @intFromFloat(box_y)) + TUT_BOX_H - TUT_BTN_H - TUT_TEXT_MARGIN;
+        const tut_btn_y = box_y + TUT_BOX_H - TUT_BTN_H - TUT_TEXT_MARGIN;
         drawButton(@as(i32, @intFromFloat(TUT_BOX_X)) + TUT_TEXT_MARGIN, tut_btn_y, TUT_BTN_W, TUT_BTN_H, "CLOSE", .maroon);
         drawButton(@as(i32, @intFromFloat(TUT_BOX_X)) + TUT_BOX_W - TUT_BTN_W - TUT_TEXT_MARGIN, tut_btn_y, TUT_BTN_W, TUT_BTN_H, if (current_step == tutorial_steps.len - 1) "FINISH" else "NEXT", .dark_green);
     }
