@@ -100,7 +100,7 @@ const tutorial_steps = [_]TutorialStep{
         .highlight = .{ .x = ENEMY_DECK_POS.x - 5, .y = ENEMY_DECK_POS.y - 5, .width = CARD_W + 10, .height = CARD_H + 30 },
     },
     .{
-        .text = "This is the FIELD. Your goal is to CAPTURE or REMOVE these.",
+        .text = "This is the FIELD. Your goal is to CAPTURE or REMOVE these cards.",
         .highlight = .{ .x = FIELD_X - 10, .y = FIELD_Y - 10, .width = (CARD_W + CARD_SPACING) * 4, .height = CARD_H + 20 },
     },
     .{
@@ -338,8 +338,18 @@ fn processInput() void {
 
         // 0. Tutorial Input
         if (tutorial_active) {
+            const step = tutorial_steps[current_step];
+            var box_y: f32 = TUT_BOX_Y;
+            if (step.highlight) |h| {
+                if (h.y < SCREEN_HEIGHT / 2) {
+                    box_y = SCREEN_HEIGHT - TUT_BOX_H - 20;
+                } else {
+                    box_y = 20;
+                }
+            }
+
             const tut_next_x = TUT_BOX_X + TUT_BOX_W - TUT_BTN_W - TUT_TEXT_MARGIN;
-            const tut_btn_y = TUT_BOX_Y + TUT_BOX_H - TUT_BTN_H - TUT_TEXT_MARGIN;
+            const tut_btn_y = box_y + TUT_BOX_H - TUT_BTN_H - TUT_TEXT_MARGIN;
 
             if (rl.checkCollisionPointRec(mouse, .{ .x = tut_next_x, .y = tut_btn_y, .width = TUT_BTN_W, .height = TUT_BTN_H })) {
                 current_step += 1;
@@ -534,19 +544,20 @@ export fn updateDrawFrame() void {
     for (flying_visuals) |maybe_v| if (maybe_v) |v| drawCard(card_texture, @as(i32, @intFromFloat(v.pos.x)), @as(i32, @intFromFloat(v.pos.y)), v.card);
 
     // Decks & Piles
+    const label_size = 12;
     if (global_state.enemy_deck.count() > 0) {
         drawCardBack(card_texture, @as(i32, @intFromFloat(ENEMY_DECK_POS.x)), @as(i32, @intFromFloat(ENEMY_DECK_POS.y)));
     } else drawSlot(@as(i32, @intFromFloat(ENEMY_DECK_POS.x)), @as(i32, @intFromFloat(ENEMY_DECK_POS.y)));
     var enemy_label_buf: [32]u8 = undefined;
     const enemy_label = std.fmt.bufPrintZ(&enemy_label_buf, "Enemy: {d}", .{global_state.enemy_deck.count()}) catch "Enemy";
-    rl.drawText(enemy_label, @as(i32, @intFromFloat(ENEMY_DECK_POS.x)), @as(i32, @intFromFloat(ENEMY_DECK_POS.y)) + CARD_H + 5, 10, .light_gray);
+    rl.drawText(enemy_label, @as(i32, @intFromFloat(ENEMY_DECK_POS.x)), @as(i32, @intFromFloat(ENEMY_DECK_POS.y)) + CARD_H + label_size / 2, label_size, .light_gray);
 
     if (global_state.deck.count() > 0) {
         drawCardBack(card_texture, @as(i32, @intFromFloat(PLAYER_DECK_POS.x)), @as(i32, @intFromFloat(PLAYER_DECK_POS.y)));
     } else drawSlot(@as(i32, @intFromFloat(PLAYER_DECK_POS.x)), @as(i32, @intFromFloat(PLAYER_DECK_POS.y)));
     var player_label_buf: [32]u8 = undefined;
     const player_label = std.fmt.bufPrintZ(&player_label_buf, "Deck: {d}", .{global_state.deck.count()}) catch "Deck";
-    rl.drawText(player_label, @as(i32, @intFromFloat(PLAYER_DECK_POS.x)), @as(i32, @intFromFloat(PLAYER_DECK_POS.y)) + CARD_H + 5, 10, .light_gray);
+    rl.drawText(player_label, @as(i32, @intFromFloat(PLAYER_DECK_POS.x)), @as(i32, @intFromFloat(PLAYER_DECK_POS.y)) + CARD_H + label_size / 2, label_size, .light_gray);
 
     if (global_state.discard_pile.count() > 0) {
         const top = global_state.discard_pile.cards[global_state.discard_pile.len - 1];
@@ -554,10 +565,10 @@ export fn updateDrawFrame() void {
     } else drawSlot(@as(i32, @intFromFloat(DISCARD_POS.x)), @as(i32, @intFromFloat(DISCARD_POS.y)));
     var discard_label_buf: [32]u8 = undefined;
     const discard_label = std.fmt.bufPrintZ(&discard_label_buf, "Discard: {d}", .{global_state.discard_pile.count()}) catch "Discard";
-    rl.drawText(discard_label, @as(i32, @intFromFloat(DISCARD_POS.x)), @as(i32, @intFromFloat(DISCARD_POS.y)) + CARD_H + 5, 10, .light_gray);
+    rl.drawText(discard_label, @as(i32, @intFromFloat(DISCARD_POS.x)), @as(i32, @intFromFloat(DISCARD_POS.y)) + CARD_H + label_size / 2, label_size, .light_gray);
 
     if (removed_count > 0) drawCardBack(card_texture, @as(i32, @intFromFloat(REMOVED_POS.x)), @as(i32, @intFromFloat(REMOVED_POS.y))) else drawSlot(@as(i32, @intFromFloat(REMOVED_POS.x)), @as(i32, @intFromFloat(REMOVED_POS.y)));
-    rl.drawText("Removed", @as(i32, @intFromFloat(REMOVED_POS.x)), @as(i32, @intFromFloat(REMOVED_POS.y)) + CARD_H + 5, 10, .light_gray);
+    rl.drawText("Removed", @as(i32, @intFromFloat(REMOVED_POS.x)), @as(i32, @intFromFloat(REMOVED_POS.y)) + CARD_H + label_size / 2, label_size, .light_gray);
 
     // UI
     if (global_state.phase == .action) {
@@ -596,13 +607,24 @@ export fn updateDrawFrame() void {
             rl.drawRectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, dim_color);
         }
 
-        const box_rect = rl.Rectangle{ .x = TUT_BOX_X, .y = TUT_BOX_Y, .width = TUT_BOX_W, .height = TUT_BOX_H };
+        var box_y: f32 = TUT_BOX_Y;
+        if (step.highlight) |h| {
+            // If highlight is in the top half, move box to bottom
+            if (h.y < SCREEN_HEIGHT / 2) {
+                box_y = SCREEN_HEIGHT - TUT_BOX_H - 20;
+            } else {
+                // If highlight is in bottom half, move box to top
+                box_y = 20;
+            }
+        }
+
+        const box_rect = rl.Rectangle{ .x = TUT_BOX_X, .y = box_y, .width = TUT_BOX_W, .height = TUT_BOX_H };
         rl.drawRectangleRec(box_rect, .dark_gray);
         rl.drawRectangleLinesEx(box_rect, 2, .ray_white);
 
-        drawTextWrapped(step.text, @as(i32, @intFromFloat(TUT_BOX_X)) + TUT_TEXT_MARGIN, @as(i32, @intFromFloat(TUT_BOX_Y)) + TUT_TEXT_MARGIN, TUT_BOX_W - (TUT_TEXT_MARGIN * 2), 20, .ray_white);
+        drawTextWrapped(step.text, @as(i32, @intFromFloat(TUT_BOX_X)) + TUT_TEXT_MARGIN, @as(i32, @intFromFloat(box_y)) + TUT_TEXT_MARGIN, TUT_BOX_W - (TUT_TEXT_MARGIN * 2), 20, .ray_white);
 
-        const tut_btn_y = @as(i32, @intFromFloat(TUT_BOX_Y)) + TUT_BOX_H - TUT_BTN_H - TUT_TEXT_MARGIN;
+        const tut_btn_y = @as(i32, @intFromFloat(box_y)) + TUT_BOX_H - TUT_BTN_H - TUT_TEXT_MARGIN;
         drawButton(@as(i32, @intFromFloat(TUT_BOX_X)) + TUT_TEXT_MARGIN, tut_btn_y, TUT_BTN_W, TUT_BTN_H, "CLOSE", .maroon);
         drawButton(@as(i32, @intFromFloat(TUT_BOX_X)) + TUT_BOX_W - TUT_BTN_W - TUT_TEXT_MARGIN, tut_btn_y, TUT_BTN_W, TUT_BTN_H, if (current_step == tutorial_steps.len - 1) "FINISH" else "NEXT", .dark_green);
     }
@@ -615,6 +637,7 @@ fn drawTextWrapped(text: [:0]const u8, x: i32, y: i32, width: i32, fontSize: i32
 
     var it = std.mem.tokenizeAny(u8, text, " ");
     while (it.next()) |word| {
+        // Use a local buffer for the word to add null terminator
         var word_buf: [128:0]u8 = undefined;
         const word_z: [:0]const u8 = std.fmt.bufPrintZ(&word_buf, "{s}", .{word}) catch "err";
 
