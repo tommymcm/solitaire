@@ -14,27 +14,8 @@ const CARD_W = 80;
 const CARD_H = 110;
 const SPACING = 20;
 
-// New spritesheet info: 14 columns, 4 rows
-// Card size in sheet: 71x95
 const SHEET_COLS = 14;
 const SHEET_ROWS = 4;
-
-// GLOBALS
-var gpa_instance = std.heap.GeneralPurposeAllocator(.{ .stack_trace_frames = 0 }){};
-var prng_instance: std.Random.DefaultPrng = undefined;
-var global_state: GameState = undefined;
-var card_texture: rl.Texture2D = undefined;
-var is_initialized: bool = false;
-
-// Selection State
-var selected_hand: [4]bool = [_]bool{false} ** 4;
-var selected_field: ?usize = null;
-var status_message: [128:0]u8 = [_:0]u8{0} ** 128;
-
-// Animation State
-var field_visuals: [4]?VisualCard = [_]?VisualCard{null} ** 4;
-var hand_visuals: [4]?VisualCard = [_]?VisualCard{null} ** 4;
-var flying_visuals: [16]?VisualCard = [_]?VisualCard{null} ** 16;
 
 const FIELD_X = 210;
 const FIELD_Y = 150;
@@ -78,6 +59,23 @@ const VisualCard = struct {
     }
 };
 
+// GLOBALS
+var gpa_instance = std.heap.GeneralPurposeAllocator(.{ .stack_trace_frames = 0 }){};
+var prng_instance: std.Random.DefaultPrng = undefined;
+var global_state: GameState = undefined;
+var card_texture: rl.Texture2D = undefined;
+var is_initialized: bool = false;
+
+// Selection State
+var selected_hand: [4]bool = [_]bool{false} ** 4;
+var selected_field: ?usize = null;
+var status_message: [128:0]u8 = [_:0]u8{0} ** 128;
+
+// Animation State
+var field_visuals: [4]?VisualCard = [_]?VisualCard{null} ** 4;
+var hand_visuals: [4]?VisualCard = [_]?VisualCard{null} ** 4;
+var flying_visuals: [16]?VisualCard = [_]?VisualCard{null} ** 16;
+
 pub fn main() !void {
     const allocator = if (builtin.os.tag == .emscripten)
         std.heap.wasm_allocator
@@ -96,7 +94,7 @@ pub fn main() !void {
     global_state = try GameState.init(allocator, random);
     syncVisuals(.none);
     is_initialized = true;
-    _ = std.fmt.bufPrintZ(&status_message, "Welcome! Select cards and choose an action.", .{}) catch unreachable;
+    _ = std.fmt.bufPrintZ(&status_message, "Welcome! Select hand cards then click a field card to capture.", .{}) catch unreachable;
 
     if (builtin.os.tag == .emscripten) {
         rl.setTargetFPS(60);
@@ -202,6 +200,7 @@ fn processInput() void {
     if (rl.isMouseButtonPressed(.left)) {
         const mouse = rl.getMousePosition();
 
+        // 1. Hand Clicks (Selection)
         for (0..4) |i| {
             const x = @as(f32, @floatFromInt(HAND_X + @as(i32, @intCast(i)) * (CARD_W + SPACING)));
             const rect = rl.Rectangle{ .x = x, .y = HAND_Y, .width = CARD_W, .height = CARD_H };
@@ -212,11 +211,29 @@ fn processInput() void {
             }
         }
 
+        // 2. Field Clicks (Auto-Capture or Selection)
         for (0..4) |i| {
             const x = @as(f32, @floatFromInt(FIELD_X + @as(i32, @intCast(3 - i)) * (CARD_W + SPACING)));
             const rect = rl.Rectangle{ .x = x, .y = FIELD_Y, .width = CARD_W, .height = CARD_H };
             if (rl.checkCollisionPointRec(mouse, rect)) {
-                if (global_state.field[i] != null) {
+                if (global_state.field[i]) |_| {
+                    // Try to capture immediately if any hand cards are selected
+                    var h_indices: [4]usize = undefined;
+                    var count: usize = 0;
+                    for (selected_hand, 0..) |sel, j| if (sel) { h_indices[count] = j; count += 1; };
+
+                    if (count > 0 and global_state.phase == .action) {
+                        if (global_state.playCapture(h_indices[0..count], i, null)) |success| {
+                            if (success) {
+                                _ = std.fmt.bufPrintZ(&status_message, "Capture successful!", .{}) catch unreachable;
+                                resetSelection();
+                                syncVisuals(.capture);
+                                return; 
+                            }
+                        } else |_| {}
+                    }
+                    
+                    // Fallback to normal selection
                     if (selected_field == i) {
                         selected_field = null;
                     } else {
@@ -226,11 +243,8 @@ fn processInput() void {
             }
         }
 
+        // 3. Action Buttons (Sacrifice, Delay, Discard)
         if (global_state.phase == .action) {
-            if (rl.checkCollisionPointRec(mouse, .{ .x = 650, .y = 50, .width = 120, .height = 40 })) {
-                handleCapture();
-                syncVisuals(.capture);
-            }
             if (rl.checkCollisionPointRec(mouse, .{ .x = 650, .y = 100, .width = 120, .height = 40 })) {
                 handleSacrifice();
                 syncVisuals(.sacrifice);
@@ -246,24 +260,6 @@ fn processInput() void {
             }
         }
     }
-}
-
-fn handleCapture() void {
-    var h_indices: [4]usize = undefined;
-    var count: usize = 0;
-    for (selected_hand, 0..) |sel, i| if (sel) { h_indices[count] = i; count += 1; };
-
-    if (count == 0 or selected_field == null) {
-        _ = std.fmt.bufPrintZ(&status_message, "Select hand card(s) and one field card!", .{}) catch unreachable;
-        return;
-    }
-
-    if (global_state.playCapture(h_indices[0..count], selected_field.?, null)) |success| {
-        if (success) {
-            _ = std.fmt.bufPrintZ(&status_message, "Capture successful!", .{}) catch unreachable;
-            resetSelection();
-        } else _ = std.fmt.bufPrintZ(&status_message, "Invalid capture!", .{}) catch unreachable;
-    } else |err| _ = std.fmt.bufPrintZ(&status_message, "Error: {any}", .{err}) catch unreachable;
 }
 
 fn handleSacrifice() void {
@@ -341,11 +337,9 @@ export fn updateDrawFrame() void {
         return;
     }
 
-    // Slots
     for (0..4) |i| drawSlot(@as(i32, @intFromFloat(FIELD_X)) + @as(i32, @intCast(3 - i)) * (CARD_W + SPACING), @intFromFloat(FIELD_Y));
     for (0..4) |i| drawSlot(@as(i32, @intFromFloat(HAND_X)) + @as(i32, @intCast(i)) * (CARD_W + SPACING), @intFromFloat(HAND_Y));
 
-    // Cards
     for (field_visuals, 0..) |maybe_v, i| if (maybe_v) |v| {
         drawCard(card_texture, @intFromFloat(v.pos.x), @intFromFloat(v.pos.y), v.card);
         if (selected_field == i) rl.drawRectangleLinesEx(.{ .x = v.pos.x, .y = v.pos.y, .width = CARD_W, .height = CARD_H }, 3, .yellow);
@@ -375,9 +369,7 @@ export fn updateDrawFrame() void {
         drawSlot(@as(i32, @intFromFloat(DISCARD_POS.x)), @as(i32, @intFromFloat(DISCARD_POS.y)));
     }
 
-    // UI
     if (global_state.phase == .action) {
-        drawButton(650, 50, 120, 40, "CAPTURE", .maroon);
         drawButton(650, 100, 120, 40, "SACRIFICE", .orange);
         drawButton(650, 150, 120, 40, "DELAY", .dark_blue);
     } else if (global_state.phase == .discard) drawButton(650, 50, 120, 40, "CONFIRM DISCARD", .dark_gray)
@@ -401,53 +393,18 @@ fn drawSlot(x: i32, y: i32) void { rl.drawRectangleLines(x, y, CARD_W, CARD_H, .
 fn drawCard(tex: rl.Texture2D, x: i32, y: i32, card: Card) void {
     const sw = @as(f32, @floatFromInt(tex.width)) / SHEET_COLS;
     const sh = @as(f32, @floatFromInt(tex.height)) / SHEET_ROWS;
-
     var col: f32 = 0; var row: f32 = 0;
-    if (card.rank == .joker) { 
-        col = 0; row = 2; // Joker is Col 0, Row 2
-    } else { 
-        // Rows: Hearts (0), Clubs (1), Diamonds (2), Spades (3)
-        row = switch (card.suit) {
-            .hearts => @as(f32, 0),
-            .clubs => @as(f32, 1),
-            .diamonds => @as(f32, 2),
-            .spades => @as(f32, 3),
-        };
-        
-        // Columns: 2-10 are 1-9, J is 10, Q is 11, K is 12, A is 13
+    if (card.rank == .joker) { col = 0; row = 2; } 
+    else { 
+        row = switch (card.suit) { .hearts => @as(f32, 0), .clubs => @as(f32, 1), .diamonds => @as(f32, 2), .spades => @as(f32, 3) };
         const rank_val = @intFromEnum(card.rank);
-        col = switch (card.rank) {
-            .ace => @as(f32, 13),
-            else => @floatFromInt(rank_val), // 2 is index 2, but in sheet 2 is col 1
-        };
-        // Wait, rank enum mapping: joker=0, ace=1, two=2...
-        // If 2 is Col 1, then col = rank_val - 1 for 2-10,J,Q,K
-        // Let's re-verify rank enum: ace is 1. If Ace is col 13, then:
-        if (card.rank == .ace) {
-            col = 13;
-        } else {
-            // rank two (2) -> col 1
-            // rank ten (10) -> col 9
-            // rank jack (11) -> col 10
-            // rank king (13) -> col 12
-            col = @floatFromInt(rank_val - 1);
-        }
+        if (card.rank == .ace) { col = 13; } else { col = @floatFromInt(rank_val - 1); }
     }
-    
-    rl.drawTexturePro(tex, 
-        .{ .x = col * sw, .y = row * sh, .width = sw, .height = sh }, 
-        .{ .x = @floatFromInt(x), .y = @floatFromInt(y), .width = CARD_W, .height = CARD_H }, 
-        .{ .x = 0, .y = 0 }, 0, .white
-    );
+    rl.drawTexturePro(tex, .{ .x = col * sw, .y = row * sh, .width = sw, .height = sh }, .{ .x = @floatFromInt(x), .y = @floatFromInt(y), .width = CARD_W, .height = CARD_H }, .{ .x = 0, .y = 0 }, 0, .white);
 }
 
 fn drawCardBack(tex: rl.Texture2D, x: i32, y: i32) void {
     const sw = @as(f32, @floatFromInt(tex.width)) / SHEET_COLS;
     const sh = @as(f32, @floatFromInt(tex.height)) / SHEET_ROWS;
-    // Card back is at (0, 0)
-    rl.drawTexturePro(tex, 
-        .{ .x = 0, .y = 0, .width = sw, .height = sh }, 
-        .{ .x = @floatFromInt(x), .y = @floatFromInt(y), .width = CARD_W, .height = CARD_H }, 
-        .{ .x = 0, .y = 0 }, 0, .white
-    );
+    rl.drawTexturePro(tex, .{ .x = 0, .y = 0, .width = sw, .height = sh }, .{ .x = @floatFromInt(x), .y = @floatFromInt(y), .width = CARD_W, .height = CARD_H }, .{ .x = 0, .y = 0 }, 0, .white);
 }
