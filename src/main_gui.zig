@@ -8,7 +8,7 @@ const GameState = solitaire.rules.GameState;
 const Card = solitaire.card.Card;
 
 const SCREEN_WIDTH = 600;
-const SCREEN_HEIGHT = 370;
+const SCREEN_HEIGHT = 380;
 
 const CARD_W = 80;
 const CARD_H = 110;
@@ -23,7 +23,7 @@ const ANIM_SPEED = 10.0;
 const MARGIN_X = 25;
 const MARGIN_Y = 25; // Top margin for decks and cards
 const PAD_X = 2 * CARD_SPACING;
-const PAD_Y = 40;
+const PAD_Y = 50;
 
 const FIELD_X = MARGIN_X + CARD_W + PAD_X;
 const FIELD_Y = MARGIN_Y;
@@ -120,35 +120,25 @@ const tutorial_steps = [_]TutorialStep{
         .box_pos = .top,
     },
     .{
-        .text = "At the start of your TURN, you may DISCARD any number of cards.",
+        .text = "On your TURN, you may take ONE of three actions: CAPTURE, SACRIFICE, or DELAY.",
+    },
+    .{
+        .text = "To CAPTURE: Select cards with the same SUIT in your HAND.",
         .highlight = .{ .x = HAND_X - HL_FIELD_OFF, .y = HAND_Y - HL_FIELD_OFF, .width = HL_FIELD_W, .height = HL_FIELD_H },
         .box_pos = .top,
     },
     .{
-        .text = "Then, draw from your DECK until you have FOUR cards in your HAND.",
-        .highlight = .{ .x = PLAYER_DECK_POS.x - 5, .y = PLAYER_DECK_POS.y - 5, .width = CARD_W + 10, .height = CARD_H + 30 },
-        .box_pos = .top,
-    },
-    .{
-        .text = "If your DECK is empty, SHUFFLE your DISCARD PILE. It becomes your new DECK.",
-        .highlight = .{ .x = DISCARD_POS.x - 5, .y = DISCARD_POS.y - 5, .width = CARD_W + 10, .height = CARD_H + 30 },
-        .box_pos = .top,
-    },
-    .{
-        .text = "On your TURN, you may take ONE of three actions: CAPTURE, SACRIFICE, or DELAY.",
-    },
-    .{
-        .text = "To CAPTURE: Select cards with the same SUIT in your HAND. Then, select a field card of equal or lesser VALUE to CAPTURE.",
-        .highlight = .{ .x = FIELD_X - HL_FIELD_OFF, .y = FIELD_Y - HL_FIELD_OFF, .width = HL_FIELD_W, .height = (HAND_Y + CARD_H) - FIELD_Y + 20 },
+        .text = "Then, select a card in the field of equal or lesser VALUE to CAPTURE.",
+        .highlight = .{ .x = FIELD_X - HL_FIELD_OFF, .y = FIELD_Y - HL_FIELD_OFF, .width = HL_FIELD_W, .height = HL_FIELD_H },
         .box_pos = .bottom,
     },
     .{
-        .text = "Then, place the CAPTURED card and all cards used from your HAND in your DISCARD pile.",
-        .highlight = .{ .x = DISCARD_POS.x - 5, .y = DISCARD_POS.y - 5, .width = CARD_W + 10, .height = CARD_H + 30 },
-        .box_pos = .top,
+        .text = "NOTE: Jokers MIMIC the highest VALUE card in your hand of the matching SUIT.",
     },
     .{
-        .text = "NOTE: Jokers MIMIC the highest VALUE card in your hand of the matching SUIT.",
+        .text = "The CAPTURED card and all cards used from your HAND are placed in your DISCARD pile.",
+        .highlight = .{ .x = DISCARD_POS.x - 5, .y = DISCARD_POS.y - 5, .width = CARD_W + 10, .height = CARD_H + 30 },
+        .box_pos = .top,
     },
     .{
         .text = "To SACRIFICE: Select ONE card from your hand. Both it and the rightmost field card are REMOVED forever.",
@@ -164,6 +154,21 @@ const tutorial_steps = [_]TutorialStep{
         .text = "After your TURN, cards in the FIELD move to the RIGHT and a new card is drawn from the ENEMY DECK.",
         .highlight = .{ .x = FIELD_X - HL_FIELD_OFF, .y = FIELD_Y - HL_FIELD_OFF, .width = HL_FIELD_W, .height = HL_FIELD_H },
         .box_pos = .bottom,
+    },
+    .{
+        .text = "Then, you may DISCARD any number of cards from your HAND.",
+        .highlight = .{ .x = HAND_X - HL_FIELD_OFF, .y = HAND_Y - HL_FIELD_OFF, .width = HL_FIELD_W, .height = HL_FIELD_H },
+        .box_pos = .top,
+    },
+    .{
+        .text = "Finally, draw from your DECK until you have FOUR cards in your HAND before taking your next TURN.",
+        .highlight = .{ .x = PLAYER_DECK_POS.x - 5, .y = PLAYER_DECK_POS.y - 5, .width = CARD_W + 10, .height = CARD_H + 30 },
+        .box_pos = .top,
+    },
+    .{
+        .text = "If your DECK is empty, SHUFFLE your DISCARD PILE. It becomes your new DECK.",
+        .highlight = .{ .x = DISCARD_POS.x - 5, .y = DISCARD_POS.y - 5, .width = CARD_W + 10, .height = CARD_H + 30 },
+        .box_pos = .top,
     },
     .{
         .text = "To WIN: Capture all FACE CARDS (A, J, Q, K)! If a FACE CARD is REMOVED, you LOSE...",
@@ -646,11 +651,13 @@ export fn updateDrawFrame() void {
         drawTextWrapped(step.text, @as(i32, @intFromFloat(TUT_BOX_X)) + TUT_TEXT_MARGIN, box_y + TUT_TEXT_MARGIN, TUT_BOX_W - (TUT_TEXT_MARGIN * 2), 20, .ray_white);
 
         const tut_btn_y = box_y + TUT_BOX_H - TUT_BTN_H - TUT_TEXT_MARGIN;
+        const tut_next_btn_x = TUT_BOX_X + TUT_BOX_W - TUT_BTN_W - TUT_TEXT_MARGIN;
+        const tut_prev_btn_x = tut_next_btn_x - TUT_BTN_W - TUT_TEXT_MARGIN;
         drawButton(@as(i32, @intFromFloat(TUT_BOX_X)) + TUT_TEXT_MARGIN, tut_btn_y, TUT_BTN_W, TUT_BTN_H, "CLOSE", .maroon);
         if (current_step > 0) {
-            drawButton(@as(i32, @intFromFloat((TUT_BOX_X + TUT_BOX_W - TUT_BTN_W) / 2)), tut_btn_y, TUT_BTN_W, TUT_BTN_H, "PREV", .dark_gray);
+            drawButton(@as(i32, @intFromFloat(tut_prev_btn_x)), tut_btn_y, TUT_BTN_W, TUT_BTN_H, "PREV", .dark_gray);
         }
-        drawButton(@as(i32, @intFromFloat(TUT_BOX_X + TUT_BOX_W - TUT_BTN_W - TUT_TEXT_MARGIN)), tut_btn_y, TUT_BTN_W, TUT_BTN_H, if (current_step == tutorial_steps.len - 1) "FINISH" else "NEXT", .dark_green);
+        drawButton(@as(i32, @intFromFloat(tut_next_btn_x)), tut_btn_y, TUT_BTN_W, TUT_BTN_H, if (current_step == tutorial_steps.len - 1) "FINISH" else "NEXT", .dark_green);
     }
 }
 
