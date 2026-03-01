@@ -96,11 +96,11 @@ const TutorialStep = struct {
 const tutorial_steps = [_]TutorialStep{
     .{ .text = "Welcome to CARD CAPTURE! Click Next to learn the basics." },
     .{
-        .text = "This is the ENEMY DECK. It contains cards you must capture to win.",
+        .text = "This is the ENEMY DECK. It contains cards you must CAPTURE to WIN!",
         .highlight = .{ .x = ENEMY_DECK_POS.x - 5, .y = ENEMY_DECK_POS.y - 5, .width = CARD_W + 10, .height = CARD_H + 30 },
     },
     .{
-        .text = "This is the FIELD. Your goal is to clear these!",
+        .text = "This is the FIELD. Your goal is to CAPTURE or REMOVE these.",
         .highlight = .{ .x = FIELD_X - 10, .y = FIELD_Y - 10, .width = (CARD_W + CARD_SPACING) * 4, .height = CARD_H + 20 },
     },
     .{
@@ -134,11 +134,11 @@ const tutorial_steps = [_]TutorialStep{
         .text = "NOTE: Jokers MIMIC the highest VALUE card in your hand of the matching SUIT.",
     },
     .{
-        .text = "To SACRIFICE: Select ONE hand card and click this. Both it and the rightmost field card are REMOVED forever.",
+        .text = "To SACRIFICE: Select ONE card from your hand. Both it and the rightmost field card are REMOVED forever.",
         .highlight = .{ .x = SACRIFICE_BTN_X - 5, .y = BTN_ROW_Y - 5, .width = BTN_W + 10, .height = BTN_H + 10 },
     },
     .{
-        .text = "To DELAY: Select TWO hand cards to REMOVE, the rightmost field card goes to the bottom of the ENEMY DECK.",
+        .text = "To DELAY: Select TWO cards from your hand to REMOVE, the rightmost field card goes to the bottom of the ENEMY DECK.",
         .highlight = .{ .x = DELAY_BTN_X - 5, .y = BTN_ROW_Y - 5, .width = BTN_W + 10, .height = BTN_H + 10 },
     },
     .{
