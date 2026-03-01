@@ -128,7 +128,7 @@ const tutorial_steps = [_]TutorialStep{
         .box_pos = .top,
     },
     .{
-        .text = "Then, select a card in the field of equal or lesser VALUE to CAPTURE.",
+        .text = "Then, select a card in the FIELD of equal or lesser VALUE to CAPTURE.",
         .highlight = .{ .x = FIELD_X - HL_FIELD_OFF, .y = FIELD_Y - HL_FIELD_OFF, .width = HL_FIELD_W, .height = HL_FIELD_H },
         .box_pos = .bottom,
     },
