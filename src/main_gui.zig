@@ -66,6 +66,7 @@ var prng_instance: std.Random.DefaultPrng = undefined;
 var global_state: GameState = undefined;
 var card_texture: rl.Texture2D = undefined;
 var is_initialized: bool = false;
+var main_allocator: std.mem.Allocator = undefined;
 
 // Selection State
 var selected_hand: [4]bool = [_]bool{false} ** 4;
@@ -79,7 +80,7 @@ var flying_visuals: [16]?VisualCard = [_]?VisualCard{null} ** 16;
 var removed_count: usize = 0;
 
 pub fn main() !void {
-    const allocator = if (builtin.os.tag == .emscripten)
+    main_allocator = if (builtin.os.tag == .emscripten)
         std.heap.wasm_allocator
     else
         gpa_instance.allocator();
@@ -89,14 +90,10 @@ pub fn main() !void {
     var seed: u64 = undefined;
     try std.posix.getrandom(std.mem.asBytes(&seed));
     prng_instance = std.Random.DefaultPrng.init(seed);
-    const random = prng_instance.random();
 
     card_texture = try rl.loadTexture("assets/cards.png");
 
-    global_state = try GameState.init(allocator, random);
-    syncVisuals(.none);
-    is_initialized = true;
-    _ = std.fmt.bufPrintZ(&status_message, "Select hand cards then click a field card to capture.", .{}) catch unreachable;
+    try restartGame();
 
     if (builtin.os.tag == .emscripten) {
         rl.setTargetFPS(60);
@@ -114,6 +111,31 @@ pub fn main() !void {
             updateDrawFrame();
         }
     }
+}
+
+fn restartGame() !void {
+    if (is_initialized) {
+        global_state.deinit();
+    }
+    
+    const random = prng_instance.random();
+    global_state = try GameState.init(main_allocator, random);
+    
+    // Reset Selection
+    for (0..4) |i| selected_hand[i] = false;
+    selected_field = null;
+    
+    // Reset Visuals
+    for (0..4) |i| {
+        field_visuals[i] = null;
+        hand_visuals[i] = null;
+    }
+    for (0..16) |i| flying_visuals[i] = null;
+    removed_count = 0;
+    
+    syncVisuals(.none);
+    is_initialized = true;
+    _ = std.fmt.bufPrintZ(&status_message, "Welcome! Select hand cards then click a field card to capture.", .{}) catch unreachable;
 }
 
 const ActionType = enum { none, capture, sacrifice, delay, discard };
@@ -217,10 +239,18 @@ fn syncVisuals(action: ActionType) void {
 }
 
 fn processInput() void {
-    if (!is_initialized or global_state.phase == .game_over) return;
+    if (!is_initialized) return;
 
     if (rl.isMouseButtonPressed(.left)) {
         const mouse = rl.getMousePosition();
+
+        if (global_state.phase == .game_over) {
+            // PLAY AGAIN button at x=340
+            if (rl.checkCollisionPointRec(mouse, .{ .x = 340, .y = 300, .width = 120, .height = 40 })) {
+                restartGame() catch {};
+            }
+            return;
+        }
 
         // 1. Hand Clicks (Selection)
         for (0..4) |i| {
@@ -423,16 +453,27 @@ export fn updateDrawFrame() void {
     } else if (global_state.phase == .discard) {
         drawButton(340, 410, 120, 40, "CONFIRM DISCARD", .dark_gray);
     } else if (global_state.phase == .game_over) {
-        rl.drawText("GAME OVER", 300, 200, 40, .red);
+        const msg = if (global_state.is_won) "VICTORY!" else "DEFEAT";
+        const col = if (global_state.is_won) rl.Color.gold else rl.Color.red;
+        const tw = rl.measureText(msg, 40);
+        rl.drawText(msg, @divTrunc(SCREEN_WIDTH - tw, 2), 200, 40, col);
+        
+        drawButton(340, 300, 120, 40, "PLAY AGAIN", .dark_gray);
     }
 
     // Status message at the top
-    const sw = rl.measureText(&status_message, 20);
-    rl.drawText(&status_message, @divTrunc(SCREEN_WIDTH - sw, 2), 20, 20, .ray_white);
+    if (global_state.phase != .game_over) {
+        const sw = rl.measureText(&status_message, 20);
+        rl.drawText(&status_message, @divTrunc(SCREEN_WIDTH - sw, 2), 20, 20, .ray_white);
+    }
     
     var buf: [64]u8 = undefined;
     rl.drawText(std.fmt.bufPrintZ(&buf, "Score: {d}", .{global_state.captured_count}) catch "Score: ERROR", 10, 420, 20, .ray_white);
-    rl.drawText(switch (global_state.phase) { .action => "Phase: ACTION", .discard => "Phase: DISCARD", .game_over => "Phase: GAME OVER" }, 10, 150, 20, .gold);
+    
+    if (global_state.phase != .game_over) {
+        const phase_text = switch (global_state.phase) { .action => "Phase: ACTION", .discard => "Phase: DISCARD", .game_over => "" };
+        rl.drawText(phase_text, 10, 150, 20, .gold);
+    }
 }
 
 fn drawButton(x: i32, y: i32, w: i32, h: i32, text: [:0]const u8, color: rl.Color) void {

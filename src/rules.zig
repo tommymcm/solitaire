@@ -24,6 +24,7 @@ pub const GameState = struct {
     captured_count: u32,
     allocator: std.mem.Allocator,
     is_lost: bool = false,
+    is_won: bool = false,
     phase: Phase = .action,
 
     pub fn emptyHand(self: GameState) bool {
@@ -41,11 +42,9 @@ pub const GameState = struct {
     }
 
     pub fn init(allocator: std.mem.Allocator, rng: std.Random) !GameState {
-        std.debug.print("Rules: init start\n", .{});
         var player_deck = Deck.init(allocator, rng);
         var enemy_deck = Deck.init(allocator, rng);
 
-        std.debug.print("Rules: populating decks\n", .{});
         // Populate decks based on rules:
         // Player: 2-4 of each suit + 2 jokers
         // Enemy: everything else
@@ -63,12 +62,10 @@ pub const GameState = struct {
             }
         }
 
-        std.debug.print("Rules: adding jokers\n", .{});
-        // Add 2 jokers to player deck (suit doesn't matter for jokers usually)
+        // Add 2 jokers to player deck
         try player_deck.append(.{ .suit = .hearts, .rank = .joker });
         try player_deck.append(.{ .suit = .spades, .rank = .joker });
 
-        std.debug.print("Rules: shuffling\n", .{});
         enemy_deck.shuffle();
         player_deck.shuffle();
 
@@ -82,14 +79,11 @@ pub const GameState = struct {
             .allocator = allocator,
         };
 
-        std.debug.print("Rules: dealing initial field\n", .{});
         // Initial deal to field (4 cards from ENEMY deck)
-        // Rule: face cards or Aces are put at the bottom of the deck during first fill
         var dealt: usize = 0;
         while (dealt < 4) {
             if (state.enemy_deck.draw()) |c| {
                 const rank_int = @intFromEnum(c.rank);
-                // Ace=1, Jack=11, Queen=12, King=13
                 if (rank_int == 1 or rank_int >= 11) {
                     try state.enemy_deck.putOnBottom(c);
                 } else {
@@ -105,11 +99,7 @@ pub const GameState = struct {
             } else break;
         }
 
-        std.debug.print("Rules: refilling hand\n", .{});
-        // Initial draw to hand (4 cards from PLAYER deck)
         state.refillHand();
-
-        std.debug.print("Rules: init done\n", .{});
         return state;
     }
 
@@ -123,10 +113,8 @@ pub const GameState = struct {
         var i: u8 = 0;
         while (i < 4) : (i += 1) {
             if (self.field[i] == null) {
-                // Find the next card.
                 var j: u8 = i + 1;
                 while (j < 4) : (j += 1) {
-                    // Move card into the empty forward slot.
                     if (self.field[j] != null) {
                         self.field[i] = self.field[j];
                         self.field[j] = null;
@@ -177,9 +165,7 @@ pub const GameState = struct {
                 if (self.deck.draw()) |c| {
                     self.hand[i] = c;
                 } else {
-                    // Deck empty, try discard pile
                     if (self.discard_pile.count() > 0) {
-                        // Move discard pile to deck and shuffle
                         while (self.discard_pile.draw()) |c| {
                             self.deck.append(c) catch {};
                         }
@@ -191,7 +177,6 @@ pub const GameState = struct {
         }
     }
 
-    /// Checks if the selected hand cards can capture the target field card.
     pub fn canCapture(self: GameState, hand_indices: []const usize, field_idx: usize, joker_mimic: ?card_mod.Card) bool {
         if (field_idx >= 4) return false;
         const target = self.field[field_idx] orelse return false;
@@ -207,14 +192,13 @@ pub const GameState = struct {
                 if (common_suit == null) {
                     common_suit = h_card.suit;
                 } else if (common_suit != h_card.suit) {
-                    return false; // Mixed suits in selection
+                    return false;
                 }
             }
         }
 
         var effective_mimic = joker_mimic;
         if (has_suited_card) {
-            // Auto-mimic: find highest value card of common_suit in hand
             const suit = common_suit.?;
             var max_val: u8 = 0;
             var best_card: ?card_mod.Card = null;
@@ -237,16 +221,14 @@ pub const GameState = struct {
 
         for (hand_indices) |idx| {
             const h_card = self.hand[idx] orelse return false;
-
             var effective_card = h_card;
             if (h_card.rank == .joker) {
                 if (effective_mimic) |m| {
                     effective_card = m;
                 } else {
-                    return false; // Joker with no mimic (and no suited card to auto-mimic)
+                    return false;
                 }
             }
-
             if (final_suit == null) {
                 final_suit = effective_card.suit;
             } else if (final_suit != effective_card.suit) {
@@ -255,54 +237,18 @@ pub const GameState = struct {
             total_value += effective_card.rank.value();
         }
 
-        // Match target suit and check value
         if (final_suit != target.suit) return false;
         return total_value >= target.rank.value();
     }
 
-    /// Applies the capture if valid.
     pub fn applyCapture(self: *GameState, hand_indices: []const usize, field_idx: usize, joker_mimic: ?card_mod.Card) !bool {
         if (!self.canCapture(hand_indices, field_idx, joker_mimic)) return false;
 
-        // Determine effective mimic for scoring/discarding if needed (though not used currently for score)
-        // Re-calculate mimic for capture action
-        var has_suited_card = false;
-        var common_suit: ?card_mod.Suit = null;
-        for (hand_indices) |idx| {
-            const h_card = self.hand[idx].?;
-            if (h_card.rank != .joker) {
-                has_suited_card = true;
-                common_suit = h_card.suit;
-                break;
-            }
-        }
-
-        var effective_mimic = joker_mimic;
-        if (has_suited_card) {
-            const suit = common_suit.?;
-            var max_val: u8 = 0;
-            var best_card: ?card_mod.Card = null;
-            for (self.hand) |maybe_card| {
-                if (maybe_card) |c| {
-                    if (c.suit == suit and c.rank != .joker) {
-                        const v = c.rank.value();
-                        if (v > max_val) {
-                            max_val = v;
-                            best_card = c;
-                        }
-                    }
-                }
-            }
-            effective_mimic = best_card;
-        }
-
-        // Capture the field card
         const target = self.field[field_idx].?;
         self.field[field_idx] = null;
         try self.discard_pile.append(target);
-        self.captured_count += 1; // Only field cards increase score
+        self.captured_count += 1;
 
-        // Remove hand cards and add them to discard pile
         for (hand_indices) |idx| {
             const h_card = self.hand[idx].?;
             self.hand[idx] = null;
@@ -323,12 +269,8 @@ pub const GameState = struct {
         }
     }
 
-    /// Refills the field from the enemy deck.
     pub fn drawNextEnemy(self: *GameState) !void {
-        // March existing field forward.
         self.marchField();
-
-        // Draw a new card to the field.
         self.field[3] = self.enemy_deck.draw();
     }
 
@@ -363,28 +305,40 @@ pub const GameState = struct {
         if (self.phase != .discard) return;
         try self.discardFromHand(indices);
         self.refillHand();
-        if (self.isGameOver()) {
-            self.phase = .game_over;
-        } else {
-            self.phase = .action;
-        }
+        self.checkGameOver();
+        if (self.phase != .game_over) self.phase = .action;
     }
 
     pub fn endActionPhase(self: *GameState) !void {
         try self.drawNextEnemy();
-        if (self.isGameOver()) {
-            self.phase = .game_over;
-        } else {
-            self.phase = .discard;
-        }
+        self.checkGameOver();
+        if (self.phase != .game_over) self.phase = .discard;
     }
 
-    pub fn isGameOver(self: GameState) bool {
-        if (self.is_lost) return true;
-        // Hand empty and deck empty
-        for (self.hand) |h| {
-            if (h != null) return false;
+    pub fn checkGameOver(self: *GameState) void {
+        if (self.is_lost) {
+            self.phase = .game_over;
+            return;
         }
-        return self.deck.count() == 0;
+
+        // Win condition: Enemy deck empty AND field empty
+        var field_empty = true;
+        for (self.field) |f| if (f != null) { field_empty = false; };
+        
+        if (self.enemy_deck.count() == 0 and field_empty) {
+            self.is_won = true;
+            self.phase = .game_over;
+            return;
+        }
+
+        // Standard lose condition: Out of options
+        // If player deck and discard are empty AND hand empty
+        var hand_empty = true;
+        for (self.hand) |h| if (h != null) { hand_empty = false; };
+
+        if (hand_empty and self.deck.count() == 0 and self.discard_pile.count() == 0) {
+            self.is_lost = true;
+            self.phase = .game_over;
+        }
     }
 };
