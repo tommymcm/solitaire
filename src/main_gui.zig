@@ -345,7 +345,6 @@ fn processInput() void {
         }
 
         // 3. Action Buttons
-        const BTN_Y = 360;
         if (global_state.phase == .action) {
             if (rl.checkCollisionPointRec(mouse, .{ .x = 190, .y = BTN_Y, .width = 100, .height = 30 })) {
                 handleSacrifice();
