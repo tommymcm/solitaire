@@ -44,7 +44,6 @@ pub fn build(b: *std.Build) !void {
             .flags = emcc_flags,
             .settings = emcc_settings,
             .install_dir = install_dir,
-            .shell_file_path = b.path("web/shell.html"),
             .embed_paths = &.{
                 .{ .src_path = "assets/", .virtual_path = "assets/" },
             },
