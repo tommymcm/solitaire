@@ -371,6 +371,10 @@ export fn updateDrawFrame() void {
 
     if (global_state.enemy_deck.count() > 0) {
         drawCardBack(card_texture, @as(i32, @intFromFloat(ENEMY_DECK_POS.x)), @as(i32, @intFromFloat(ENEMY_DECK_POS.y)));
+        var count_buf: [16]u8 = undefined;
+        const count_text = std.fmt.bufPrintZ(&count_buf, "{d}", .{global_state.enemy_deck.count()}) catch "!";
+        const tw = rl.measureText(count_text, 20);
+        rl.drawText(count_text, @as(i32, @intFromFloat(ENEMY_DECK_POS.x)) + @divTrunc(CARD_W - tw, 2), @as(i32, @intFromFloat(ENEMY_DECK_POS.y)) + @divTrunc(CARD_H - 20, 2), 20, .white);
     } else {
         drawSlot(@as(i32, @intFromFloat(ENEMY_DECK_POS.x)), @as(i32, @intFromFloat(ENEMY_DECK_POS.y)));
     }
@@ -378,6 +382,10 @@ export fn updateDrawFrame() void {
     
     if (global_state.deck.count() > 0) {
         drawCardBack(card_texture, @as(i32, @intFromFloat(PLAYER_DECK_POS.x)), @as(i32, @intFromFloat(PLAYER_DECK_POS.y)));
+        var count_buf: [16]u8 = undefined;
+        const count_text = std.fmt.bufPrintZ(&count_buf, "{d}", .{global_state.deck.count()}) catch "!";
+        const tw = rl.measureText(count_text, 20);
+        rl.drawText(count_text, @as(i32, @intFromFloat(PLAYER_DECK_POS.x)) + @divTrunc(CARD_W - tw, 2), @as(i32, @intFromFloat(PLAYER_DECK_POS.y)) + @divTrunc(CARD_H - 20, 2), 20, .white);
     } else {
         drawSlot(@as(i32, @intFromFloat(PLAYER_DECK_POS.x)), @as(i32, @intFromFloat(PLAYER_DECK_POS.y)));
     }
