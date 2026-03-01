@@ -436,6 +436,10 @@ export fn updateDrawFrame() void {
     if (global_state.discard_pile.count() > 0) {
         const top = global_state.discard_pile.cards[global_state.discard_pile.len - 1];
         drawCard(card_texture, @as(i32, @intFromFloat(DISCARD_POS.x)), @as(i32, @intFromFloat(DISCARD_POS.y)), top);
+        var count_buf: [16]u8 = undefined;
+        const count_text = std.fmt.bufPrintZ(&count_buf, "{d}", .{global_state.discard_pile.count()}) catch "!";
+        const tw = rl.measureText(count_text, 20);
+        rl.drawText(count_text, @as(i32, @intFromFloat(DISCARD_POS.x)) + @divTrunc(CARD_W - tw, 2), @as(i32, @intFromFloat(DISCARD_POS.y)) + @divTrunc(CARD_H - 20, 2), 20, .white);
     } else {
         drawSlot(@as(i32, @intFromFloat(DISCARD_POS.x)), @as(i32, @intFromFloat(DISCARD_POS.y)));
     }
@@ -473,7 +477,7 @@ export fn updateDrawFrame() void {
     rl.drawText(std.fmt.bufPrintZ(&buf, "Score: {d}", .{global_state.captured_count}) catch "Score: ERROR", 10, 420, 20, .ray_white);
     
     if (global_state.phase != .game_over) {
-        const phase_text = switch (global_state.phase) { .action => "Phase: ACTION", .discard => "Phase: DISCARD", .game_over => "" };
+        const phase_text = switch (global_state.phase) { .action => "ACTION", .discard => "DISCARD", .game_over => "" };
         rl.drawText(phase_text, 10, 150, 20, .gold);
     }
 }
