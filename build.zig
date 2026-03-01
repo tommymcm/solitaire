@@ -20,7 +20,7 @@ pub fn build(b: *std.Build) !void {
         const raylib_artifact = raylib_dep.artifact("raylib");
 
         const wasm = b.addLibrary(.{
-            .name = "solitaire-wasm",
+            .name = "menagerie",
             .root_module = b.createModule(.{
                 .root_source_file = b.path("src/main_gui.zig"),
                 .target = target,
@@ -36,13 +36,10 @@ pub fn build(b: *std.Build) !void {
         const install_dir: std.Build.InstallDir = .{ .custom = "web" };
         
         // Add --preload-file assets and --shell-file to emcc flags
-        // Some versions of emccStep take a slice, others a HashMap. 
-        // Based on previous error, it expects a HashMap for .flags
         var emcc_flags = emsdk.emccDefaultFlags(b.allocator, .{ .optimize = optimize });
         
-        // Remove potentially conflicting flags if any
-        _ = emcc_flags.remove("--shell-file");
-        
+        // Use a single string for flags that need values to keep them together during HashMap iteration
+        // This is a common workaround for unordered maps in some build wrappers
         try emcc_flags.put("--preload-file assets", {});
         try emcc_flags.put("--shell-file web/shell.html", {});
 
