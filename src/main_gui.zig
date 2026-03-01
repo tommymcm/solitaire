@@ -282,9 +282,8 @@ fn processInput() void {
     if (rl.isMouseButtonPressed(.left)) {
         const mouse = rl.getMousePosition();
 
-        // 0. Tutorial Input (Always takes precedence)
+        // 0. Tutorial Input
         if (tutorial_active) {
-            // Next Button
             if (rl.checkCollisionPointRec(mouse, .{ .x = 550, .y = 250, .width = 80, .height = 30 })) {
                 current_step += 1;
                 if (current_step >= tutorial_steps.len) {
@@ -292,7 +291,6 @@ fn processInput() void {
                     current_step = 0;
                 }
             }
-            // Close Button
             if (rl.checkCollisionPointRec(mouse, .{ .x = 170, .y = 250, .width = 80, .height = 30 })) {
                 tutorial_active = false;
                 current_step = 0;
@@ -300,7 +298,6 @@ fn processInput() void {
             return;
         }
 
-        // Tooltip Button (Top Right)
         if (rl.checkCollisionPointRec(mouse, .{ .x = 690, .y = 10, .width = 100, .height = 30 })) {
             tutorial_active = true;
             current_step = 0;
@@ -504,9 +501,8 @@ export fn updateDrawFrame() void {
     if (global_state.phase == .action) {
         drawButton(290, 410, 100, 30, "SACRIFICE", .orange);
         drawButton(410, 410, 100, 30, "DELAY", .dark_blue);
-    } else if (global_state.phase == .discard) {
-        drawButton(350, 410, 100, 30, "CONFIRM", .dark_gray);
-    } else if (global_state.phase == .game_over) {
+    } else if (global_state.phase == .discard) drawButton(350, 410, 100, 30, "CONFIRM", .dark_gray)
+    else if (global_state.phase == .game_over) {
         const msg = if (global_state.is_won) "VICTORY!" else "DEFEAT";
         const col = if (global_state.is_won) rl.Color.gold else rl.Color.red;
         rl.drawText(msg, @divTrunc(SCREEN_WIDTH - rl.measureText(msg, 40), 2), 200, 40, col);
@@ -516,7 +512,8 @@ export fn updateDrawFrame() void {
     drawButton(690, 10, 100, 30, "TOOLTIP", .dark_gray);
 
     if (global_state.phase != .game_over) {
-        rl.drawText(&status_message, @divTrunc(SCREEN_WIDTH - rl.measureText(&status_message, 20), 2), 20, 20, .ray_white);
+        const sw_msg = rl.measureText(&status_message, 20);
+        rl.drawText(&status_message, @divTrunc(SCREEN_WIDTH - sw_msg, 2), 20, 20, .ray_white);
         rl.drawText(if (global_state.phase == .action) "ACTION" else "DISCARD", 10, 150, 20, .gold);
     }
     
@@ -532,16 +529,35 @@ export fn updateDrawFrame() void {
             rl.drawRectangleLinesEx(rect, 3, .yellow);
         }
 
-        // Instruction Box
         const box_rect = rl.Rectangle{ .x = 150, .y = 150, .width = 500, .height = 150 };
         rl.drawRectangleRec(box_rect, .dark_gray);
         rl.drawRectangleLinesEx(box_rect, 2, .ray_white);
         
-        // Wrap text manually or use a helper
-        rl.drawText(step.text, 170, 170, 20, .ray_white);
+        drawTextWrapped(step.text, 170, 170, 460, 20, .ray_white);
 
         drawButton(170, 250, 80, 30, "CLOSE", .maroon);
         drawButton(550, 250, 80, 30, if (current_step == tutorial_steps.len - 1) "FINISH" else "NEXT", .dark_green);
+    }
+}
+
+fn drawTextWrapped(text: [:0]const u8, x: i32, y: i32, width: i32, fontSize: i32, color: rl.Color) void {
+    var cursor_x: i32 = x;
+    var cursor_y: i32 = y;
+    const space_width = rl.measureText(" ", fontSize);
+
+    var it = std.mem.tokenizeAny(u8, text, " ");
+    while (it.next()) |word| {
+        // Use a local buffer for the word to add null terminator
+        var word_buf: [128:0]u8 = undefined;
+        const word_z: [:0]const u8 = std.fmt.bufPrintZ(&word_buf, "{s}", .{word}) catch "err";
+        
+        const word_width = rl.measureText(word_z, fontSize);
+        if (cursor_x + word_width > x + width) {
+            cursor_x = x;
+            cursor_y += fontSize + 5;
+        }
+        rl.drawText(word_z, cursor_x, cursor_y, fontSize, color);
+        cursor_x += word_width + space_width;
     }
 }
 
@@ -549,7 +565,8 @@ fn drawButton(x: i32, y: i32, w: i32, h: i32, text: [:0]const u8, color: rl.Colo
     const rect = rl.Rectangle{ .x = @floatFromInt(x), .y = @floatFromInt(y), .width = @floatFromInt(w), .height = @floatFromInt(h) };
     rl.drawRectangleRec(rect, color);
     rl.drawRectangleLinesEx(rect, 2, .ray_white);
-    rl.drawText(text, x + @divTrunc(w - rl.measureText(text, 10), 2), y + @divTrunc(h - 10, 2), 10, .ray_white);
+    const tw = rl.measureText(text, 10);
+    rl.drawText(text, x + @divTrunc(w - tw, 2), y + @divTrunc(h - 10, 2), 10, .ray_white);
 }
 
 fn drawSlot(x: i32, y: i32) void { rl.drawRectangleLines(x, y, CARD_W, CARD_H, .gray); }
