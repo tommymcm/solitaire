@@ -22,7 +22,7 @@ const FIELD_Y = 150;
 const HAND_X = 210;
 const HAND_Y = 300;
 
-const ENEMY_DECK_POS = rl.Vector2{ .x = 20, .y = 20 };
+const ENEMY_DECK_POS = rl.Vector2{ .x = 20, .y = 150 };
 const PLAYER_DECK_POS = rl.Vector2{ .x = 20, .y = 300 };
 const DISCARD_POS = rl.Vector2{ .x = 700, .y = 300 };
 const REMOVED_POS = rl.Vector2{ .x = 700, .y = 150 };
