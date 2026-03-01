@@ -60,6 +60,42 @@ const VisualCard = struct {
     }
 };
 
+const TutorialStep = struct {
+    text: [:0]const u8,
+    highlight: ?rl.Rectangle = null,
+};
+
+const tutorial_steps = [_]TutorialStep{
+    .{ .text = "Welcome to Card Capture! Click Next to learn the basics." },
+    .{ 
+        .text = "This is the Enemy Deck. It contains cards you must capture to win.",
+        .highlight = .{ .x = 15, .y = 145, .width = CARD_W + 10, .height = CARD_H + 30 }
+    },
+    .{ 
+        .text = "This is the Field. Opponent cards move here. You want to clear these!",
+        .highlight = .{ .x = FIELD_X - 10, .y = FIELD_Y - 10, .width = (CARD_W + SPACING) * 4, .height = CARD_H + 20 }
+    },
+    .{ 
+        .text = "This is your Hand. You use these cards to interact with the field.",
+        .highlight = .{ .x = HAND_X - 10, .y = HAND_Y - 10, .width = (CARD_W + SPACING) * 4, .height = CARD_H + 20 }
+    },
+    .{ 
+        .text = "To CAPTURE: Select cards in hand that match the field card's SUIT and sum to its VALUE, then click the field card.",
+        .highlight = .{ .x = FIELD_X - 10, .y = FIELD_Y - 10, .width = (CARD_W + SPACING) * 4, .height = CARD_H + 200 }
+    },
+    .{ 
+        .text = "To SACRIFICE: Select ONE hand card and click this. Both it and the rightmost field card are REMOVED forever.",
+        .highlight = .{ .x = 285, .y = 405, .width = 110, .height = 40 }
+    },
+    .{ 
+        .text = "To DELAY: Select TWO hand cards and click this. They are REMOVED, and the field card goes back to the deck.",
+        .highlight = .{ .x = 405, .y = 405, .width = 110, .height = 40 }
+    },
+    .{ 
+        .text = "Goal: Capture all cards! If you lose a Face Card (A, J, Q, K) via sacrifice, you lose immediately.",
+    },
+};
+
 // GLOBALS
 var gpa_instance = std.heap.GeneralPurposeAllocator(.{ .stack_trace_frames = 0 }){};
 var prng_instance: std.Random.DefaultPrng = undefined;
@@ -78,6 +114,10 @@ var field_visuals: [4]?VisualCard = [_]?VisualCard{null} ** 4;
 var hand_visuals: [4]?VisualCard = [_]?VisualCard{null} ** 4;
 var flying_visuals: [16]?VisualCard = [_]?VisualCard{null} ** 16;
 var removed_count: usize = 0;
+
+// Tutorial State
+var tutorial_active: bool = false;
+var current_step: usize = 0;
 
 pub fn main() !void {
     main_allocator = if (builtin.os.tag == .emscripten)
@@ -121,11 +161,9 @@ fn restartGame() !void {
     const random = prng_instance.random();
     global_state = try GameState.init(main_allocator, random);
     
-    // Reset Selection
     for (0..4) |i| selected_hand[i] = false;
     selected_field = null;
     
-    // Reset Visuals
     for (0..4) |i| {
         field_visuals[i] = null;
         hand_visuals[i] = null;
@@ -184,7 +222,6 @@ fn syncVisuals(action: ActionType) void {
                 }
             }
             if (!found_prev) {
-                // New card from player deck
                 hand_visuals[i] = VisualCard{ .card = card, .pos = PLAYER_DECK_POS, .target_pos = target, .active = true };
             }
         } else {
@@ -219,7 +256,6 @@ fn syncVisuals(action: ActionType) void {
                 }
             }
             if (!found_prev) {
-                // New card from enemy deck
                 field_visuals[i] = VisualCard{ .card = card, .pos = ENEMY_DECK_POS, .target_pos = target, .active = true };
             }
         } else {
@@ -246,15 +282,39 @@ fn processInput() void {
     if (rl.isMouseButtonPressed(.left)) {
         const mouse = rl.getMousePosition();
 
+        // 0. Tutorial Input (Always takes precedence)
+        if (tutorial_active) {
+            // Next Button
+            if (rl.checkCollisionPointRec(mouse, .{ .x = 550, .y = 250, .width = 80, .height = 30 })) {
+                current_step += 1;
+                if (current_step >= tutorial_steps.len) {
+                    tutorial_active = false;
+                    current_step = 0;
+                }
+            }
+            // Close Button
+            if (rl.checkCollisionPointRec(mouse, .{ .x = 170, .y = 250, .width = 80, .height = 30 })) {
+                tutorial_active = false;
+                current_step = 0;
+            }
+            return;
+        }
+
+        // Tooltip Button (Top Right)
+        if (rl.checkCollisionPointRec(mouse, .{ .x = 690, .y = 10, .width = 100, .height = 30 })) {
+            tutorial_active = true;
+            current_step = 0;
+            return;
+        }
+
         if (global_state.phase == .game_over) {
-            // PLAY AGAIN button at x=350, width=100
             if (rl.checkCollisionPointRec(mouse, .{ .x = 350, .y = 300, .width = 100, .height = 30 })) {
                 restartGame() catch {};
             }
             return;
         }
 
-        // 1. Hand Clicks (Selection)
+        // 1. Hand Clicks
         for (0..4) |i| {
             const x = @as(f32, @floatFromInt(HAND_X + @as(i32, @intCast(i)) * (CARD_W + SPACING)));
             const rect = rl.Rectangle{ .x = x, .y = HAND_Y, .width = CARD_W, .height = CARD_H };
@@ -265,7 +325,7 @@ fn processInput() void {
             }
         }
 
-        // 2. Field Clicks (Auto-Capture or Selection)
+        // 2. Field Clicks
         for (0..4) |i| {
             const x = @as(f32, @floatFromInt(FIELD_X + @as(i32, @intCast(3 - i)) * (CARD_W + SPACING)));
             const rect = rl.Rectangle{ .x = x, .y = FIELD_Y, .width = CARD_W, .height = CARD_H };
@@ -295,18 +355,15 @@ fn processInput() void {
             }
         }
 
-        // 3. Action Buttons (Bottom Centered) - 100x30
+        // 3. Action Buttons
         if (global_state.phase == .action) {
-            // SACRIFICE at x=290
             if (rl.checkCollisionPointRec(mouse, .{ .x = 290, .y = 410, .width = 100, .height = 30 })) {
                 handleSacrifice();
             }
-            // DELAY at x=410
             if (rl.checkCollisionPointRec(mouse, .{ .x = 410, .y = 410, .width = 100, .height = 30 })) {
                 handleDelay();
             }
         } else if (global_state.phase == .discard) {
-            // CONFIRM DISCARD at x=350
             if (rl.checkCollisionPointRec(mouse, .{ .x = 350, .y = 410, .width = 100, .height = 30 })) {
                 handleDiscard();
             }
@@ -417,9 +474,7 @@ export fn updateDrawFrame() void {
         const count_text = std.fmt.bufPrintZ(&count_buf, "{d}", .{global_state.enemy_deck.count()}) catch "!";
         const tw = rl.measureText(count_text, 20);
         rl.drawText(count_text, @as(i32, @intFromFloat(ENEMY_DECK_POS.x)) + @divTrunc(CARD_W - tw, 2), @as(i32, @intFromFloat(ENEMY_DECK_POS.y)) + @divTrunc(CARD_H - 20, 2), 20, .white);
-    } else {
-        drawSlot(@as(i32, @intFromFloat(ENEMY_DECK_POS.x)), @as(i32, @intFromFloat(ENEMY_DECK_POS.y)));
-    }
+    } else drawSlot(@as(i32, @intFromFloat(ENEMY_DECK_POS.x)), @as(i32, @intFromFloat(ENEMY_DECK_POS.y)));
     rl.drawText("Enemy Deck", @as(i32, @intFromFloat(ENEMY_DECK_POS.x)), @as(i32, @intFromFloat(ENEMY_DECK_POS.y)) + CARD_H + 5, 10, .light_gray);
     
     if (global_state.deck.count() > 0) {
@@ -428,9 +483,7 @@ export fn updateDrawFrame() void {
         const count_text = std.fmt.bufPrintZ(&count_buf, "{d}", .{global_state.deck.count()}) catch "!";
         const tw = rl.measureText(count_text, 20);
         rl.drawText(count_text, @as(i32, @intFromFloat(PLAYER_DECK_POS.x)) + @divTrunc(CARD_W - tw, 2), @as(i32, @intFromFloat(PLAYER_DECK_POS.y)) + @divTrunc(CARD_H - 20, 2), 20, .white);
-    } else {
-        drawSlot(@as(i32, @intFromFloat(PLAYER_DECK_POS.x)), @as(i32, @intFromFloat(PLAYER_DECK_POS.y)));
-    }
+    } else drawSlot(@as(i32, @intFromFloat(PLAYER_DECK_POS.x)), @as(i32, @intFromFloat(PLAYER_DECK_POS.y)));
     rl.drawText("Your Deck", @as(i32, @intFromFloat(PLAYER_DECK_POS.x)), @as(i32, @intFromFloat(PLAYER_DECK_POS.y)) + CARD_H + 5, 10, .light_gray);
 
     if (global_state.discard_pile.count() > 0) {
@@ -440,16 +493,11 @@ export fn updateDrawFrame() void {
         const count_text = std.fmt.bufPrintZ(&count_buf, "{d}", .{global_state.discard_pile.count()}) catch "!";
         const tw = rl.measureText(count_text, 20);
         rl.drawText(count_text, @as(i32, @intFromFloat(DISCARD_POS.x)) + @divTrunc(CARD_W - tw, 2), @as(i32, @intFromFloat(DISCARD_POS.y)) + @divTrunc(CARD_H - 20, 2), 20, .white);
-    } else {
-        drawSlot(@as(i32, @intFromFloat(DISCARD_POS.x)), @as(i32, @intFromFloat(DISCARD_POS.y)));
-    }
+    } else drawSlot(@as(i32, @intFromFloat(DISCARD_POS.x)), @as(i32, @intFromFloat(DISCARD_POS.y)));
     rl.drawText("Discard", @as(i32, @intFromFloat(DISCARD_POS.x)), @as(i32, @intFromFloat(DISCARD_POS.y)) + CARD_H + 5, 10, .light_gray);
 
-    if (removed_count > 0) {
-        drawCardBack(card_texture, @as(i32, @intFromFloat(REMOVED_POS.x)), @as(i32, @intFromFloat(REMOVED_POS.y)));
-    } else {
-        drawSlot(@as(i32, @intFromFloat(REMOVED_POS.x)), @as(i32, @intFromFloat(REMOVED_POS.y)));
-    }
+    if (removed_count > 0) drawCardBack(card_texture, @as(i32, @intFromFloat(REMOVED_POS.x)), @as(i32, @intFromFloat(REMOVED_POS.y)))
+    else drawSlot(@as(i32, @intFromFloat(REMOVED_POS.x)), @as(i32, @intFromFloat(REMOVED_POS.y)));
     rl.drawText("Removed", @as(i32, @intFromFloat(REMOVED_POS.x)), @as(i32, @intFromFloat(REMOVED_POS.y)) + CARD_H + 5, 10, .light_gray);
 
     // UI
@@ -461,24 +509,39 @@ export fn updateDrawFrame() void {
     } else if (global_state.phase == .game_over) {
         const msg = if (global_state.is_won) "VICTORY!" else "DEFEAT";
         const col = if (global_state.is_won) rl.Color.gold else rl.Color.red;
-        const tw = rl.measureText(msg, 40);
-        rl.drawText(msg, @divTrunc(SCREEN_WIDTH - tw, 2), 200, 40, col);
-        
+        rl.drawText(msg, @divTrunc(SCREEN_WIDTH - rl.measureText(msg, 40), 2), 200, 40, col);
         drawButton(350, 300, 100, 30, "PLAY AGAIN", .dark_gray);
     }
 
-    // Status message at the top
+    drawButton(690, 10, 100, 30, "TOOLTIP", .dark_gray);
+
     if (global_state.phase != .game_over) {
-        const sw = rl.measureText(&status_message, 20);
-        rl.drawText(&status_message, @divTrunc(SCREEN_WIDTH - sw, 2), 20, 20, .ray_white);
+        rl.drawText(&status_message, @divTrunc(SCREEN_WIDTH - rl.measureText(&status_message, 20), 2), 20, 20, .ray_white);
+        rl.drawText(if (global_state.phase == .action) "ACTION" else "DISCARD", 10, 150, 20, .gold);
     }
     
-    var buf: [64]u8 = undefined;
-    rl.drawText(std.fmt.bufPrintZ(&buf, "Score: {d}", .{global_state.captured_count}) catch "Score: ERROR", 10, 420, 20, .ray_white);
-    
-    if (global_state.phase != .game_over) {
-        const phase_text = switch (global_state.phase) { .action => "ACTION", .discard => "DISCARD", .game_over => "" };
-        rl.drawText(phase_text, 10, 150, 20, .gold);
+    var score_buf: [64]u8 = undefined;
+    rl.drawText(std.fmt.bufPrintZ(&score_buf, "Score: {d}", .{global_state.captured_count}) catch "Score: ERROR", 10, 420, 20, .ray_white);
+
+    // Tutorial Overlay
+    if (tutorial_active) {
+        rl.drawRectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, rl.fade(.black, 0.7));
+        const step = tutorial_steps[current_step];
+        
+        if (step.highlight) |rect| {
+            rl.drawRectangleLinesEx(rect, 3, .yellow);
+        }
+
+        // Instruction Box
+        const box_rect = rl.Rectangle{ .x = 150, .y = 150, .width = 500, .height = 150 };
+        rl.drawRectangleRec(box_rect, .dark_gray);
+        rl.drawRectangleLinesEx(box_rect, 2, .ray_white);
+        
+        // Wrap text manually or use a helper
+        rl.drawText(step.text, 170, 170, 20, .ray_white);
+
+        drawButton(170, 250, 80, 30, "CLOSE", .maroon);
+        drawButton(550, 250, 80, 30, if (current_step == tutorial_steps.len - 1) "FINISH" else "NEXT", .dark_green);
     }
 }
 
@@ -486,8 +549,7 @@ fn drawButton(x: i32, y: i32, w: i32, h: i32, text: [:0]const u8, color: rl.Colo
     const rect = rl.Rectangle{ .x = @floatFromInt(x), .y = @floatFromInt(y), .width = @floatFromInt(w), .height = @floatFromInt(h) };
     rl.drawRectangleRec(rect, color);
     rl.drawRectangleLinesEx(rect, 2, .ray_white);
-    const tw = rl.measureText(text, 10);
-    rl.drawText(text, x + @divTrunc(w - tw, 2), y + 10, 10, .ray_white);
+    rl.drawText(text, x + @divTrunc(w - rl.measureText(text, 10), 2), y + @divTrunc(h - 10, 2), 10, .ray_white);
 }
 
 fn drawSlot(x: i32, y: i32) void { rl.drawRectangleLines(x, y, CARD_W, CARD_H, .gray); }
