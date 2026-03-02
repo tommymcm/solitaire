@@ -2,14 +2,15 @@ const std = @import("std");
 const rl = @import("raylib");
 const builtin = @import("builtin");
 const solitaire = @import("solitaire");
+const solitaire_gui = @import("solitaire_gui");
 
 const emscripten = std.os.emscripten;
 const GameState = solitaire.rules.GameState;
 const Card = solitaire.card.Card;
 
-const gui_card = @import("gui_card.zig");
-const gui_ui = @import("gui_ui.zig");
-const gui_tutorial = @import("gui_tutorial.zig");
+const gui_card = solitaire_gui.card;
+const gui_ui = solitaire_gui.ui;
+const gui_tutorial = solitaire_gui.tutorial;
 
 const VisualCard = gui_card.VisualCard;
 const TutorialStep = gui_tutorial.TutorialStep;

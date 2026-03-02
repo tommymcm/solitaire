@@ -15,6 +15,15 @@ pub fn build(b: *std.Build) !void {
         .target = target,
     });
 
+    const solitaire_gui_mod = b.addModule("solitaire_gui", .{
+        .root_source_file = b.path("src/gui_root.zig"),
+        .target = target,
+        .imports = &.{
+            .{ .name = "solitaire", .module = solitaire_mod },
+            .{ .name = "raylib", .module = raylib_dep.module("raylib") },
+        },
+    });
+
     if (target.query.os_tag == .emscripten) {
         const emsdk = rlz.emsdk;
         const raylib_artifact = raylib_dep.artifact("raylib");
@@ -27,6 +36,7 @@ pub fn build(b: *std.Build) !void {
                 .optimize = optimize,
                 .imports = &.{
                     .{ .name = "solitaire", .module = solitaire_mod },
+                    .{ .name = "solitaire_gui", .module = solitaire_gui_mod },
                     .{ .name = "raylib", .module = raylib_dep.module("raylib") },
                     .{ .name = "raygui", .module = raylib_dep.module("raygui") },
                 },
