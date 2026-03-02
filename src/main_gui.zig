@@ -366,7 +366,7 @@ const GuiContext = struct {
         }
     }
 
-    fn getTutBoxY(_: GuiContext, pos: TutBoxPos) i32 {
+    fn getTutBoxY(_: *const GuiContext, pos: TutBoxPos) i32 {
         return switch (pos) {
             .top => UI.tut_box_y_top,
             .center => UI.tut_box_y_center,
@@ -565,7 +565,7 @@ const GuiContext = struct {
         }
     }
 
-    pub fn draw(self: GuiContext) void {
+    pub fn draw(self: *const GuiContext) void {
         rl.beginDrawing();
         defer rl.endDrawing();
 
@@ -634,7 +634,7 @@ const GuiContext = struct {
         }
     }
 
-    fn drawLabel(self: GuiContext, comptime fmt: []const u8, val: ?usize, pos: rl.Vector2, size: f32) void {
+    fn drawLabel(self: *const GuiContext, comptime fmt: []const u8, val: ?usize, pos: rl.Vector2, size: f32) void {
         if (comptime std.mem.indexOf(u8, fmt, "{") != null) {
             if (val) |v| {
                 var buf: [32]u8 = undefined;
@@ -646,17 +646,17 @@ const GuiContext = struct {
         rl.drawTextEx(self.game_font, @ptrCast(fmt), .{ .x = pos.x, .y = pos.y + Layout.card_h + size / 2 }, size, 1, .light_gray);
     }
 
-    fn drawSlot(_: GuiContext, x: i32, y: i32) void {
+    fn drawSlot(_: *const GuiContext, x: i32, y: i32) void {
         rl.drawRectangleLines(x, y, Layout.card_w, Layout.card_h, .gray);
     }
 
-    fn drawCardBack(self: GuiContext, x: f32, y: f32) void {
+    fn drawCardBack(self: *const GuiContext, x: f32, y: f32) void {
         const sw = @as(f32, @floatFromInt(self.card_texture.width)) / Anim.sheet_cols;
         const sh = @as(f32, @floatFromInt(self.card_texture.height)) / Anim.sheet_rows;
         rl.drawTexturePro(self.card_texture, .{ .x = 0, .y = 0, .width = sw, .height = sh }, .{ .x = x, .y = y, .width = Layout.card_w, .height = Layout.card_h }, .{ .x = 0, .y = 0 }, 0, .white);
     }
 
-    fn drawButton(self: GuiContext, x: i32, y: i32, w: i32, h: i32, text: [:0]const u8, color: rl.Color) void {
+    fn drawButton(self: *const GuiContext, x: i32, y: i32, w: i32, h: i32, text: [:0]const u8, color: rl.Color) void {
         const font_size = 14;
         const rect = rl.Rectangle{ .x = @floatFromInt(x), .y = @floatFromInt(y), .width = @floatFromInt(w), .height = @floatFromInt(h) };
         rl.drawRectangleRec(rect, color);
@@ -665,7 +665,7 @@ const GuiContext = struct {
         rl.drawTextEx(self.game_font, text, .{ .x = @floatFromInt(x + @divTrunc(w - @as(i32, @intFromFloat(tw)), 2)), .y = @floatFromInt(y + @divTrunc(h - font_size, 2)) }, font_size, 1, .ray_white);
     }
 
-    fn drawTutorial(self: GuiContext) void {
+    fn drawTutorial(self: *const GuiContext) void {
         const step = tutorial_steps[self.current_step];
         const dim_color = rl.fade(.black, 0.7);
 
@@ -702,7 +702,7 @@ const GuiContext = struct {
         self.drawButton(@as(i32, @intFromFloat(tut_next_btn_x)), tut_btn_y, UI.tut_btn_w, UI.tut_btn_h, if (self.current_step == tutorial_steps.len - 1) "FINISH" else "NEXT", .dark_green);
     }
 
-    fn drawTextWrapped(self: GuiContext, text: [:0]const u8, x: i32, y: i32, width: i32, fontSize: i32, color: rl.Color) void {
+    fn drawTextWrapped(self: *const GuiContext, text: [:0]const u8, x: i32, y: i32, width: i32, fontSize: i32, color: rl.Color) void {
         var cursor_x: i32 = x;
         var cursor_y: i32 = y;
         const space_width = @as(i32, @intFromFloat(rl.measureTextEx(self.game_font, " ", @as(f32, @floatFromInt(fontSize)), 1).x));
