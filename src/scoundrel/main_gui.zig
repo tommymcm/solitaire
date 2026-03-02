@@ -41,6 +41,13 @@ const Layout = struct {
     const monster_stack = rl.Vector2{ .x = weapon.x + card_w + card_spacing, .y = bottom_y };
 };
 
+const UI = struct {
+    const btn_w = 120;
+    const btn_h = 40;
+    const escape_btn_x = Layout.margin_x;
+    const escape_btn_y = Layout.bottom_y + 50;
+};
+
 // --- GLOBALS ---
 var prng_instance: std.Random.DefaultPrng = undefined;
 var state: ScoundrelState = undefined;
@@ -208,6 +215,11 @@ export fn updateDrawFrame() void {
     var hp_buf: [32]u8 = undefined;
     const hp_text = std.fmt.bufPrintZ(&hp_buf, "HEALTH: {d}/{d}", .{ state.health, state.max_health }) catch "HP ERROR";
     rl.drawTextEx(game_font, hp_text, .{ .x = Layout.margin_x, .y = Layout.bottom_y }, 24, 1, if (state.health <= 5) .red else .ray_white);
+
+    // Escape Button
+    const can_escape = !state.last_action_escaped and state.deck.count() > 0;
+    const btn_color = if (can_escape) rl.Color.maroon else rl.Color.dark_gray;
+    gui_ui.drawButton(game_font, UI.escape_btn_x, UI.escape_btn_y, UI.btn_w, UI.btn_h, "ESCAPE", btn_color);
 
     if (state.is_won) {
         rl.drawTextEx(game_font, "VICTORY!", .{ .x = 250, .y = 180 }, 40, 2, .gold);
