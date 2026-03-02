@@ -27,10 +27,19 @@ pub const ScoundrelState = struct {
     pub fn init(allocator: std.mem.Allocator, rng: std.Random) !ScoundrelState {
         var deck = Deck.init(allocator, rng);
 
-        // Standard 52-card deck
+        // Standard 52-card deck with J,Q,K,A of hearts and diamonds removed
         for (std.enums.values(card_mod.Suit)) |suit| {
             for (std.enums.values(card_mod.Rank)) |rank| {
                 if (rank == .joker) continue;
+
+                // Remove J, Q, K, A of hearts and diamonds
+                if (suit == .hearts or suit == .diamonds) {
+                    switch (rank) {
+                        .jack, .queen, .king, .ace => continue,
+                        else => {},
+                    }
+                }
+
                 try deck.append(.{ .suit = suit, .rank = rank });
             }
         }
@@ -100,8 +109,8 @@ pub const ScoundrelState = struct {
 
         switch (card.suit) {
             .hearts => try self.consumePotion(field_idx),
-            .spades => try self.equipWeapon(field_idx),
-            .diamonds, .clubs => try self.fightMonster(field_idx),
+            .diamonds => try self.equipWeapon(field_idx),
+            .spades, .clubs => try self.fightMonster(field_idx),
         }
 
         self.cards_interacted_in_room += 1;
