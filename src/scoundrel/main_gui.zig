@@ -63,7 +63,6 @@ var selected_monster: ?usize = null;
 // Animation State
 var field_visuals: [4]?VisualCard = [_]?VisualCard{null} ** 4;
 var weapon_visual: ?VisualCard = null;
-var monster_visuals: [16]?VisualCard = [_]?VisualCard{null} ** 16;
 var flying_visuals: [16]?VisualCard = [_]?VisualCard{null} ** 16;
 
 pub fn main() !void {
@@ -113,10 +112,7 @@ fn restartGame() !void {
     selected_monster = null;
     for (0..4) |i| field_visuals[i] = null;
     weapon_visual = null;
-    for (0..16) |i| {
-        monster_visuals[i] = null;
-        flying_visuals[i] = null;
-    }
+    for (0..16) |i| flying_visuals[i] = null;
 
     syncVisuals();
     is_initialized = true;
@@ -152,8 +148,15 @@ fn syncVisuals() void {
             }
         } else {
             if (field_visuals[i]) |v| {
-                const end_pos = if (v.card.suit == .spades or v.card.suit == .clubs) 
-                    Layout.monster_stack 
+                // Determine if monster went to stack or removed pile
+                var went_to_stack = false;
+                if (state.monster_stack.count() > 0) {
+                    const top_monster = state.monster_stack.cards[state.monster_stack.len - 1];
+                    if (std.meta.eql(top_monster, v.card)) went_to_stack = true;
+                }
+
+                const end_pos = if (went_to_stack) 
+                    rl.Vector2{ .x = Layout.monster_stack.x + @as(f32, @floatFromInt(state.monster_stack.count() - 1)) * 20.0, .y = Layout.monster_stack.y }
                 else 
                     Layout.removed;
                 spawnFlying(v.card, v.pos, end_pos);
@@ -176,19 +179,6 @@ fn syncVisuals() void {
     } else {
         if (old_weapon_v) |v| spawnFlying(v.card, v.pos, Layout.removed);
         weapon_visual = null;
-    }
-
-    // 3. Process Monster Stack
-    for (0..16) |i| monster_visuals[i] = null;
-    if (state.monster_stack.count() > 0) {
-        const count = state.monster_stack.count();
-        const top_card = state.monster_stack.cards[count - 1];
-        monster_visuals[0] = VisualCard{ 
-            .card = top_card, 
-            .pos = Layout.monster_stack, 
-            .target_pos = Layout.monster_stack, 
-            .active = true 
-        };
     }
 }
 
@@ -215,7 +205,7 @@ fn processInput() void {
             return;
         }
 
-        // 2. Combat Choice Overlay Buttons (Must be checked before field cards to catch overlap)
+        // 2. Combat Choice Overlay Buttons
         if (selected_monster) |m_idx| {
             const btn_y = Layout.top_y + Layout.card_h + 10;
             const btn_x = Layout.field_x + @as(f32, @floatFromInt(m_idx)) * (Layout.card_w + Layout.card_spacing);
@@ -251,19 +241,12 @@ fn processInput() void {
                 if (card.suit == .spades or card.suit == .clubs) {
                     const monster_val = @as(i32, card.rank.value());
                     if (state.active_card != null and state.canUseWeapon(monster_val)) {
-                        // Toggle or set selection
-                        if (selected_monster == i) {
-                            selected_monster = null;
-                        } else {
-                            selected_monster = i;
-                        }
+                        selected_monster = if (selected_monster == i) null else i;
                         return;
                     } else {
-                        // Force unarmed if no weapon or constraint violation
                         state.useCard(i, false) catch {};
                     }
                 } else {
-                    // Potion or Weapon
                     state.useCard(i, true) catch {};
                 }
                 
@@ -273,7 +256,6 @@ fn processInput() void {
             }
         }
         
-        // 4. Clicked Elsewhere
         selected_monster = null;
     }
 }
@@ -284,7 +266,6 @@ export fn updateDrawFrame() void {
 
     for (&field_visuals) |*maybe_v| if (maybe_v.*) |*v| v.update(dt);
     if (weapon_visual) |*v| v.update(dt);
-    for (&monster_visuals) |*maybe_v| if (maybe_v.*) |*v| v.update(dt);
     for (&flying_visuals) |*maybe_v| {
         if (maybe_v.*) |*v| {
             v.update(dt);
@@ -330,9 +311,6 @@ export fn updateDrawFrame() void {
     // Field
     for (field_visuals) |maybe_v| if (maybe_v) |v| v.draw(card_texture, Layout.card_w, Layout.card_h);
 
-    // Flying
-    for (flying_visuals) |maybe_v| if (maybe_v) |v| v.draw(card_texture, Layout.card_w, Layout.card_h);
-
     // Weapon
     if (weapon_visual) |v| {
         v.draw(card_texture, Layout.card_w, Layout.card_h);
@@ -340,10 +318,21 @@ export fn updateDrawFrame() void {
     }
 
     // Monster Stack
-    if (monster_visuals[0]) |v| {
-        v.draw(card_texture, Layout.card_w, Layout.card_h);
-        gui_ui.drawLabel(game_font, "Stack: {d}", state.monster_stack.count(), Layout.monster_stack, 14, .red, Layout.card_h);
+    for (0..state.monster_stack.count()) |i| {
+        const card = state.monster_stack.cards[i];
+        const pos = rl.Vector2{ 
+            .x = Layout.monster_stack.x + @as(f32, @floatFromInt(i)) * 20.0, 
+            .y = Layout.monster_stack.y 
+        };
+        const vc = VisualCard{ .card = card, .pos = pos, .target_pos = pos, .active = true };
+        vc.draw(card_texture, Layout.card_w, Layout.card_h);
+        if (i == state.monster_stack.count() - 1) {
+            gui_ui.drawLabel(game_font, "Stack: {d}", state.monster_stack.count(), Layout.monster_stack, 14, .red, Layout.card_h);
+        }
     }
+
+    // Flying
+    for (flying_visuals) |maybe_v| if (maybe_v) |v| v.draw(card_texture, Layout.card_w, Layout.card_h);
 
     // Status / HP
     var hp_buf: [32]u8 = undefined;
