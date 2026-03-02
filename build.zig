@@ -30,7 +30,7 @@ pub fn build(b: *std.Build) !void {
         const emsdk = rlz.emsdk;
         const raylib_artifact = raylib_dep.artifact("raylib");
 
-        const games = [_][]const u8{ "card-capture" };
+        const games = [_][]const u8{ "card-capture", "scoundrel" };
         inline for (games) |game_name| {
             const main_gui_rel_path = b.fmt("src/{s}/main_gui.zig", .{game_name});
             const wasm = b.addLibrary(.{
