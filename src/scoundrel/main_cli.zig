@@ -37,7 +37,12 @@ pub fn main() !void {
         });
 
         if (state.active_card) |weapon| {
-            try stdout.print("Weapon: {f} (Monster Stack: {d} cards)\n", .{ weapon, state.monster_stack.count() });
+            if (state.monster_stack.count() > 0) {
+                const top_monster = state.monster_stack.cards[state.monster_stack.len - 1];
+                try stdout.print("Weapon: {f} (Last Monster: {f}, Stack: {d})\n", .{ weapon, top_monster, state.monster_stack.count() });
+            } else {
+                try stdout.print("Weapon: {f} (Monster Stack: empty)\n", .{ weapon });
+            }
         } else {
             try stdout.print("Weapon: None (Unarmed)\n", .{});
         }
@@ -57,7 +62,10 @@ pub fn main() !void {
             if (state.deck.count() == 0 and state.canAdvanceRoom()) {
                 // If deck is empty, we still need to finish the current field
                 var all_done = true;
-                for (state.field) |slot| if (slot != null) { all_done = false; break; };
+                for (state.field) |slot| if (slot != null) {
+                    all_done = false;
+                    break;
+                };
                 if (all_done) break;
             } else {
                 try stdout.print("\nRoom interaction limit reached (3 cards) or cleared! Press Enter to deal next room...", .{});
@@ -95,15 +103,15 @@ pub fn main() !void {
                     continue;
                 };
 
-                var use_weapon = true;
+                var use_weapon = false;
                 if (card.suit == .spades or card.suit == .clubs) {
                     if (state.active_card != null) {
                         try stdout.print("Fight with weapon? (y/n): ", .{});
                         try stdout.flush();
                         if (try stdin.takeDelimiter('\n')) |fight_line| {
                             const fight_trimmed = std.mem.trim(u8, fight_line, " \r\n\t");
-                            if (fight_trimmed.len > 0 and fight_trimmed[0] == 'n') {
-                                use_weapon = false;
+                            if (fight_trimmed.len > 0 and fight_trimmed[0] == 'y') {
+                                use_weapon = true;
                             }
                         }
                     }
