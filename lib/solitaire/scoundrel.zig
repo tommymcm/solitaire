@@ -82,6 +82,23 @@ pub const ScoundrelState = struct {
         self.last_action_escaped = false;
     }
 
+    pub fn escape(self: *ScoundrelState) !bool {
+        if (self.last_action_escaped) return false;
+        if (self.deck.count() == 0) return false;
+
+        // Move field to bottom of deck
+        for (&self.field) |*slot| {
+            if (slot.*) |c| {
+                try self.deck.putOnBottom(c);
+                slot.* = null;
+            }
+        }
+
+        self.last_action_escaped = true;
+        try self.dealRoom();
+        return true;
+    }
+
     pub fn canAdvanceRoom(self: ScoundrelState) bool {
         // Player can advance if they've used 3 cards, or if the field is empty (rare case)
         if (self.cards_interacted_in_room >= 3) return true;
