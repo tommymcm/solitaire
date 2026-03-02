@@ -461,17 +461,17 @@ const GuiContext = struct {
         const tut_btn_y = box_y + UI.tut_box_h - UI.tut_btn_h - UI.tut_text_margin;
         const tut_close_x = UI.tut_box_x + UI.tut_text_margin;
 
-        if (rl.checkCollisionPointRec(mouse, .{ .x = tut_next_x, .y = @floatFromInt(tut_btn_y), .width = UI.tut_btn_w, .height = UI.tut_btn_h })) {
+        if (rl.checkCollisionPointRec(mouse, .{ .x = tut_next_x, .y = @as(f32, @floatFromInt(tut_btn_y)), .width = UI.tut_btn_w, .height = UI.tut_btn_h })) {
             self.current_step += 1;
             if (self.current_step >= tutorial_steps.len) {
                 self.tutorial_active = false;
                 self.current_step = 0;
             }
         }
-        if (self.current_step > 0 and rl.checkCollisionPointRec(mouse, .{ .x = (UI.tut_box_x + UI.tut_box_w - UI.tut_btn_w) / 2, .y = @floatFromInt(tut_btn_y), .width = UI.tut_btn_w, .height = UI.tut_btn_h })) {
+        if (self.current_step > 0 and rl.checkCollisionPointRec(mouse, .{ .x = (UI.tut_box_x + UI.tut_box_w - UI.tut_btn_w) / 2, .y = @as(f32, @floatFromInt(tut_btn_y)), .width = UI.tut_btn_w, .height = UI.tut_btn_h })) {
             self.current_step -= 1;
         }
-        if (rl.checkCollisionPointRec(mouse, .{ .x = tut_close_x, .y = @floatFromInt(tut_btn_y), .width = UI.tut_btn_w, .height = UI.tut_btn_h })) {
+        if (rl.checkCollisionPointRec(mouse, .{ .x = tut_close_x, .y = @as(f32, @floatFromInt(tut_btn_y)), .width = UI.tut_btn_w, .height = UI.tut_btn_h })) {
             self.tutorial_active = false;
             self.current_step = 0;
         }
@@ -572,8 +572,8 @@ const GuiContext = struct {
         rl.clearBackground(.dark_green);
 
         // Slots
-        for (0..4) |i| self.drawSlot(@intFromFloat(Layout.field_x) + @as(i32, @intCast(3 - i)) * (Layout.card_w + Layout.card_spacing), @intFromFloat(Layout.field_y));
-        for (0..4) |i| self.drawSlot(@intFromFloat(Layout.hand_x) + @as(i32, @intCast(i)) * (Layout.card_w + Layout.card_spacing), @intFromFloat(Layout.hand_y));
+        for (0..4) |i| self.drawSlot(@as(i32, @intFromFloat(Layout.field_x)) + @as(i32, @intCast(3 - i)) * (Layout.card_w + Layout.card_spacing), @as(i32, @intFromFloat(Layout.field_y)));
+        for (0..4) |i| self.drawSlot(@as(i32, @intFromFloat(Layout.hand_x)) + @as(i32, @intCast(i)) * (Layout.card_w + Layout.card_spacing), @as(i32, @intFromFloat(Layout.hand_y)));
 
         // Cards
         for (self.field_visuals, 0..) |maybe_v, i| if (maybe_v) |v| {
@@ -590,21 +590,21 @@ const GuiContext = struct {
         const label_size = 14;
         if (self.game.enemy_deck.count() > 0) {
             self.drawCardBack(Layout.enemy_deck.x, Layout.enemy_deck.y);
-        } else self.drawSlot(@intFromFloat(Layout.enemy_deck.x), @intFromFloat(Layout.enemy_deck.y));
+        } else self.drawSlot(@as(i32, @intFromFloat(Layout.enemy_deck.x)), @as(i32, @intFromFloat(Layout.enemy_deck.y)));
         self.drawLabel("Enemy: {d}", self.game.enemy_deck.count(), Layout.enemy_deck, label_size);
 
         if (self.game.deck.count() > 0) {
             self.drawCardBack(Layout.player_deck.x, Layout.player_deck.y);
-        } else self.drawSlot(@intFromFloat(Layout.player_deck.x), @intFromFloat(Layout.player_deck.y));
+        } else self.drawSlot(@as(i32, @intFromFloat(Layout.player_deck.x)), @as(i32, @intFromFloat(Layout.player_deck.y)));
         self.drawLabel("Deck: {d}", self.game.deck.count(), Layout.player_deck, label_size);
 
         if (self.game.discard_pile.count() > 0) {
             const top = self.game.discard_pile.cards[self.game.discard_pile.len - 1];
             (VisualCard{ .card = top, .pos = Layout.discard, .target_pos = Layout.discard }).draw(self.card_texture);
-        } else self.drawSlot(@intFromFloat(Layout.discard.x), @intFromFloat(Layout.discard.y));
+        } else self.drawSlot(@as(i32, @intFromFloat(Layout.discard.x)), @as(i32, @intFromFloat(Layout.discard.y)));
         self.drawLabel("Discard: {d}", self.game.discard_pile.count(), Layout.discard, label_size);
 
-        if (self.removed_count > 0) self.drawCardBack(Layout.removed.x, Layout.removed.y) else self.drawSlot(@intFromFloat(Layout.removed.x), @intFromFloat(Layout.removed.y));
+        if (self.removed_count > 0) self.drawCardBack(Layout.removed.x, Layout.removed.y) else self.drawSlot(@as(i32, @intFromFloat(Layout.removed.x)), @as(i32, @intFromFloat(Layout.removed.y)));
         self.drawLabel("Removed", null, Layout.removed, label_size);
 
         // UI
@@ -634,10 +634,16 @@ const GuiContext = struct {
         }
     }
 
-    fn drawLabel(self: GuiContext, fmt: []const u8, val: ?usize, pos: rl.Vector2, size: f32) void {
-        var buf: [32]u8 = undefined;
-        const text = if (val) |v| std.fmt.bufPrintZ(&buf, fmt, .{v}) catch "err" else @as([:0]const u8, @ptrCast(fmt));
-        rl.drawTextEx(self.game_font, text, .{ .x = pos.x, .y = pos.y + Layout.card_h + size / 2 }, size, 1, .light_gray);
+    fn drawLabel(self: GuiContext, comptime fmt: []const u8, val: ?usize, pos: rl.Vector2, size: f32) void {
+        if (comptime std.mem.indexOf(u8, fmt, "{") != null) {
+            if (val) |v| {
+                var buf: [32]u8 = undefined;
+                const text = std.fmt.bufPrintZ(&buf, fmt, .{v}) catch "err";
+                rl.drawTextEx(self.game_font, text, .{ .x = pos.x, .y = pos.y + Layout.card_h + size / 2 }, size, 1, .light_gray);
+                return;
+            }
+        }
+        rl.drawTextEx(self.game_font, @ptrCast(fmt), .{ .x = pos.x, .y = pos.y + Layout.card_h + size / 2 }, size, 1, .light_gray);
     }
 
     fn drawSlot(_: GuiContext, x: i32, y: i32) void {
@@ -664,10 +670,10 @@ const GuiContext = struct {
         const dim_color = rl.fade(.black, 0.7);
 
         if (step.highlight) |h| {
-            const hx: i32 = @intFromFloat(h.x);
-            const hy: i32 = @intFromFloat(h.y);
-            const hw: i32 = @intFromFloat(h.width);
-            const hh: i32 = @intFromFloat(h.height);
+            const hx: i32 = @as(i32, @intFromFloat(h.x));
+            const hy: i32 = @as(i32, @intFromFloat(h.y));
+            const hw: i32 = @as(i32, @intFromFloat(h.width));
+            const hh: i32 = @as(i32, @intFromFloat(h.height));
 
             rl.drawRectangle(0, 0, Config.screen_width, hy, dim_color);
             rl.drawRectangle(0, hy + hh, Config.screen_width, Config.screen_height - (hy + hh), dim_color);
@@ -680,38 +686,38 @@ const GuiContext = struct {
         }
 
         const box_y = self.getTutBoxY(step.box_pos);
-        const box_rect = rl.Rectangle{ .x = UI.tut_box_x, .y = @floatFromInt(box_y), .width = UI.tut_box_w, .height = UI.tut_box_h };
+        const box_rect = rl.Rectangle{ .x = UI.tut_box_x, .y = @as(f32, @floatFromInt(box_y)), .width = UI.tut_box_w, .height = UI.tut_box_h };
         rl.drawRectangleRec(box_rect, .dark_gray);
         rl.drawRectangleLinesEx(box_rect, 2, .ray_white);
 
-        self.drawTextWrapped(step.text, @intFromFloat(UI.tut_box_x) + UI.tut_text_margin, box_y + UI.tut_text_margin, UI.tut_box_w - (UI.tut_text_margin * 2), 20, .ray_white);
+        self.drawTextWrapped(step.text, @as(i32, @intFromFloat(UI.tut_box_x)) + UI.tut_text_margin, box_y + UI.tut_text_margin, UI.tut_box_w - (UI.tut_text_margin * 2), 20, .ray_white);
 
         const tut_btn_y = box_y + UI.tut_box_h - UI.tut_btn_h - UI.tut_text_margin;
         const tut_next_btn_x = UI.tut_box_x + UI.tut_box_w - UI.tut_btn_w - UI.tut_text_margin;
         const tut_prev_btn_x = tut_next_btn_x - UI.tut_btn_w - UI.tut_text_margin;
-        self.drawButton(@intFromFloat(UI.tut_box_x) + UI.tut_text_margin, tut_btn_y, UI.tut_btn_w, UI.tut_btn_h, "CLOSE", .maroon);
+        self.drawButton(@as(i32, @intFromFloat(UI.tut_box_x)) + UI.tut_text_margin, tut_btn_y, UI.tut_btn_w, UI.tut_btn_h, "CLOSE", .maroon);
         if (self.current_step > 0) {
-            self.drawButton(@intFromFloat(tut_prev_btn_x), tut_btn_y, UI.tut_btn_w, UI.tut_btn_h, "PREV", .dark_gray);
+            self.drawButton(@as(i32, @intFromFloat(tut_prev_btn_x)), tut_btn_y, UI.tut_btn_w, UI.tut_btn_h, "PREV", .dark_gray);
         }
-        self.drawButton(@intFromFloat(tut_next_btn_x), tut_btn_y, UI.tut_btn_w, UI.tut_btn_h, if (self.current_step == tutorial_steps.len - 1) "FINISH" else "NEXT", .dark_green);
+        self.drawButton(@as(i32, @intFromFloat(tut_next_btn_x)), tut_btn_y, UI.tut_btn_w, UI.tut_btn_h, if (self.current_step == tutorial_steps.len - 1) "FINISH" else "NEXT", .dark_green);
     }
 
     fn drawTextWrapped(self: GuiContext, text: [:0]const u8, x: i32, y: i32, width: i32, fontSize: i32, color: rl.Color) void {
         var cursor_x: i32 = x;
         var cursor_y: i32 = y;
-        const space_width = @as(i32, @intFromFloat(rl.measureTextEx(self.game_font, " ", @floatFromInt(fontSize), 1).x));
+        const space_width = @as(i32, @intFromFloat(rl.measureTextEx(self.game_font, " ", @as(f32, @floatFromInt(fontSize)), 1).x));
 
         var it = std.mem.tokenizeAny(u8, text, " ");
         while (it.next()) |word| {
             var word_buf: [128:0]u8 = undefined;
             const word_z: [:0]const u8 = std.fmt.bufPrintZ(&word_buf, "{s}", .{word}) catch "err";
 
-            const word_width = @as(i32, @intFromFloat(rl.measureTextEx(self.game_font, word_z, @floatFromInt(fontSize), 1).x));
+            const word_width = @as(i32, @intFromFloat(rl.measureTextEx(self.game_font, word_z, @as(f32, @floatFromInt(fontSize)), 1).x));
             if (cursor_x + word_width > x + width) {
                 cursor_x = x;
                 cursor_y += fontSize + 5;
             }
-            rl.drawTextEx(self.game_font, word_z, .{ .x = @floatFromInt(cursor_x), .y = @floatFromInt(cursor_y) }, @floatFromInt(fontSize), 1, color);
+            rl.drawTextEx(self.game_font, word_z, .{ .x = @as(f32, @floatFromInt(cursor_x)), .y = @as(f32, @floatFromInt(cursor_y)) }, @as(f32, @floatFromInt(fontSize)), 1, color);
             cursor_x += word_width + space_width;
         }
     }
