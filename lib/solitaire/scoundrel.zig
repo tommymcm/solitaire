@@ -103,14 +103,14 @@ pub const ScoundrelState = struct {
         return true;
     }
 
-    pub fn useCard(self: *ScoundrelState, field_idx: usize) !void {
+    pub fn useCard(self: *ScoundrelState, field_idx: usize, use_weapon: bool) !void {
         if (field_idx >= 4) return error.InvalidIndex;
         const card = self.field[field_idx] orelse return error.EmptySlot;
 
         switch (card.suit) {
             .hearts => try self.consumePotion(field_idx),
             .diamonds => try self.equipWeapon(field_idx),
-            .spades, .clubs => try self.fightMonster(field_idx),
+            .spades, .clubs => try self.fightMonster(field_idx, use_weapon),
         }
 
         self.cards_interacted_in_room += 1;
@@ -138,11 +138,12 @@ pub const ScoundrelState = struct {
         self.field[idx] = null;
     }
 
-    fn fightMonster(self: *ScoundrelState, idx: usize) !void {
+    fn fightMonster(self: *ScoundrelState, idx: usize, use_weapon: bool) !void {
         const card = self.field[idx].?;
         const monster_val = @as(i32, card.rank.value());
 
-        if (self.active_card) |weapon| {
+        if (use_weapon and self.active_card != null) {
+            const weapon = self.active_card.?;
             const weapon_val = @as(i32, weapon.rank.value());
             const last_monster_val = if (self.monster_stack.count() > 0)
                 @as(i32, self.monster_stack.cards[self.monster_stack.len - 1].rank.value())
@@ -150,7 +151,7 @@ pub const ScoundrelState = struct {
                 weapon_val;
 
             if (monster_val < last_monster_val) {
-                // Defeated with weapon
+                // Defeated with weapon - no damage taken, added to stack
                 try self.monster_stack.append(card);
             } else {
                 // Take damage even with weapon if monster is too strong
@@ -158,7 +159,7 @@ pub const ScoundrelState = struct {
                 try self.removed_pile.append(card);
             }
         } else {
-            // Unarmed combat - full damage
+            // Unarmed combat (either by choice or no weapon) - full damage taken
             self.health -= monster_val;
             try self.removed_pile.append(card);
         }
