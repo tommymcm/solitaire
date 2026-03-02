@@ -103,7 +103,7 @@ pub const ScoundrelState = struct {
     pub fn canAdvanceRoom(self: ScoundrelState) bool {
         // Player can advance if they've used 3 cards, or if the field is empty (rare case)
         if (self.cards_interacted_in_room >= 3) return true;
-        
+
         var field_empty = true;
         for (self.field) |slot| if (slot != null) {
             field_empty = false;
@@ -114,12 +114,11 @@ pub const ScoundrelState = struct {
 
     pub fn canUseWeapon(self: ScoundrelState, monster_val: i32) bool {
         if (self.active_card == null) return false;
-        const weapon_val = @as(i32, self.active_card.?.rank.value());
-        const last_monster_val = if (self.monster_stack.count() > 0)
-            @as(i32, self.monster_stack.cards[self.monster_stack.len - 1].rank.value())
-        else
-            weapon_val;
+        
+        // If stack is empty, any monster can be fought with the weapon (it will deal Monster - Weapon damage)
+        if (self.monster_stack.count() == 0) return true;
 
+        const last_monster_val = @as(i32, self.monster_stack.cards[self.monster_stack.len - 1].rank.value());
         return monster_val < last_monster_val;
     }
 
