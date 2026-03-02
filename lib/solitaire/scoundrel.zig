@@ -20,6 +20,7 @@ pub const ScoundrelState = struct {
     health: i32,
     max_health: i32,
     last_action_escaped: bool = false,
+    potion_consumed_in_room: bool = false,
     cards_interacted_in_room: usize = 0,
     is_won: bool = false,
     is_lost: bool = false,
@@ -79,6 +80,7 @@ pub const ScoundrelState = struct {
             }
         }
         self.cards_interacted_in_room = 0;
+        self.potion_consumed_in_room = false;
     }
 
     pub fn escape(self: *ScoundrelState) !bool {
@@ -130,8 +132,11 @@ pub const ScoundrelState = struct {
 
     fn consumePotion(self: *ScoundrelState, idx: usize) !void {
         const card = self.field[idx].?;
-        const heal_amt = card.rank.value();
-        self.health = @min(self.max_health, self.health + @as(i32, heal_amt));
+        if (!self.potion_consumed_in_room) {
+            const heal_amt = card.rank.value();
+            self.health = @min(self.max_health, self.health + @as(i32, heal_amt));
+            self.potion_consumed_in_room = true;
+        }
         try self.removed_pile.append(card);
         self.field[idx] = null;
     }
