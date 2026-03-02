@@ -247,7 +247,8 @@ fn processInput() void {
             
             if (rl.checkCollisionPointRec(mouse, rect)) {
                 if (state.field[i]) |card| {
-                    if (state.canAdvanceRoom()) return;
+                    // Only block if we actually have more rooms to deal
+                    if (state.canAdvanceRoom() and state.deck.count() > 0) return;
 
                     if ((card.suit == .spades or card.suit == .clubs) and state.active_card != null) {
                         const monster_val = @as(i32, card.rank.value());
