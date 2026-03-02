@@ -49,6 +49,7 @@ const UI = struct {
 };
 
 // --- GLOBALS ---
+var gpa_instance = std.heap.GeneralPurposeAllocator(.{}){};
 var prng_instance: std.Random.DefaultPrng = undefined;
 var state: ScoundrelState = undefined;
 var card_texture: rl.Texture2D = undefined;
@@ -69,7 +70,7 @@ pub fn main() !void {
     main_allocator = if (builtin.os.tag == .emscripten)
         std.heap.wasm_allocator
     else
-        std.heap.c_allocator;
+        gpa_instance.allocator();
 
     rl.initWindow(Config.screen_width, Config.screen_height, "Scoundrel");
 
@@ -90,7 +91,10 @@ pub fn main() !void {
         defer rl.closeWindow();
         defer rl.unloadTexture(card_texture);
         defer rl.unloadFont(game_font);
-        defer state.deinit();
+        defer {
+            state.deinit();
+            _ = gpa_instance.deinit();
+        }
 
         rl.setTargetFPS(Config.target_fps);
         while (!rl.windowShouldClose()) {
@@ -199,7 +203,19 @@ fn processInput() void {
     if (rl.isMouseButtonPressed(.left)) {
         const mouse = rl.getMousePosition();
 
-        // 1. Combat Choice
+        // 1. Escape / Next Room Button
+        if (rl.checkCollisionPointRec(mouse, .{ .x = UI.escape_btn_x, .y = UI.escape_btn_y, .width = UI.btn_w, .height = UI.btn_h })) {
+            if (state.canAdvanceRoom()) {
+                state.dealRoom() catch {};
+            } else {
+                _ = state.escape() catch {};
+            }
+            selected_monster = null;
+            syncVisuals();
+            return;
+        }
+
+        // 2. Combat Choice Overlay Buttons (Must be checked before field cards to catch overlap)
         if (selected_monster) |m_idx| {
             const btn_y = Layout.top_y + Layout.card_h + 10;
             const btn_x = Layout.field_x + @as(f32, @floatFromInt(m_idx)) * (Layout.card_w + Layout.card_spacing);
@@ -216,28 +232,9 @@ fn processInput() void {
                 syncVisuals();
                 return;
             }
-            
-            selected_monster = null;
-            return;
         }
 
-        // 2. Next Room / Escape Buttons
-        if (state.canAdvanceRoom()) {
-            if (rl.checkCollisionPointRec(mouse, .{ .x = UI.escape_btn_x, .y = UI.escape_btn_y, .width = UI.btn_w, .height = UI.btn_h })) {
-                state.dealRoom() catch {};
-                syncVisuals();
-                return;
-            }
-        } else {
-            const can_escape = !state.last_action_escaped and state.deck.count() > 0;
-            if (can_escape and rl.checkCollisionPointRec(mouse, .{ .x = UI.escape_btn_x, .y = UI.escape_btn_y, .width = UI.btn_w, .height = UI.btn_h })) {
-                _ = state.escape() catch {};
-                syncVisuals();
-                return;
-            }
-        }
-
-        // 3. Field Clicks
+        // 3. Field Card Clicks
         for (0..4) |i| {
             const target = rl.Vector2{ 
                 .x = Layout.field_x + @as(f32, @floatFromInt(i)) * (Layout.card_w + Layout.card_spacing), 
@@ -246,24 +243,38 @@ fn processInput() void {
             const rect = rl.Rectangle{ .x = target.x, .y = target.y, .width = Layout.card_w, .height = Layout.card_h };
             
             if (rl.checkCollisionPointRec(mouse, rect)) {
-                if (state.field[i]) |card| {
-                    // Only block if we actually have more rooms to deal
-                    if (state.canAdvanceRoom() and state.deck.count() > 0) return;
+                const card = state.field[i] orelse continue;
+                
+                // Enforce room limits
+                if (state.deck.count() > 0 and state.cards_interacted_in_room >= 3) return;
 
-                    if ((card.suit == .spades or card.suit == .clubs) and state.active_card != null) {
-                        const monster_val = @as(i32, card.rank.value());
-                        if (state.canUseWeapon(monster_val)) {
+                if (card.suit == .spades or card.suit == .clubs) {
+                    const monster_val = @as(i32, card.rank.value());
+                    if (state.active_card != null and state.canUseWeapon(monster_val)) {
+                        // Toggle or set selection
+                        if (selected_monster == i) {
+                            selected_monster = null;
+                        } else {
                             selected_monster = i;
-                            return;
                         }
+                        return;
+                    } else {
+                        // Force unarmed if no weapon or constraint violation
+                        state.useCard(i, false) catch {};
                     }
-                    
+                } else {
+                    // Potion or Weapon
                     state.useCard(i, true) catch {};
-                    syncVisuals();
-                    return;
                 }
+                
+                selected_monster = null;
+                syncVisuals();
+                return;
             }
         }
+        
+        // 4. Clicked Elsewhere
+        selected_monster = null;
     }
 }
 
@@ -288,44 +299,58 @@ export fn updateDrawFrame() void {
 
     if (!is_initialized) return;
 
+    // Slots
     gui_card.drawSlot(Layout.deck, Layout.card_w, Layout.card_h, .gray);
     for (0..4) |i| {
-        gui_card.drawSlot(.{ 
+        const target = rl.Vector2{ 
             .x = Layout.field_x + @as(f32, @floatFromInt(i)) * (Layout.card_w + Layout.card_spacing), 
             .y = Layout.top_y 
-        }, Layout.card_w, Layout.card_h, .gray);
+        };
+        gui_card.drawSlot(target, Layout.card_w, Layout.card_h, .gray);
+        if (selected_monster == i) {
+            rl.drawRectangleLinesEx(.{ .x = target.x, .y = target.y, .width = Layout.card_w, .height = Layout.card_h }, 3, .yellow);
+        }
     }
     gui_card.drawSlot(Layout.removed, Layout.card_w, Layout.card_h, .gray);
     gui_card.drawSlot(Layout.weapon, Layout.card_w, Layout.card_h, .gray);
     gui_card.drawSlot(Layout.monster_stack, Layout.card_w, Layout.card_h, .gray);
 
+    // Deck
     if (state.deck.count() > 0) {
         gui_card.drawCardBack(card_texture, Layout.deck, Layout.card_w, Layout.card_h);
     }
     gui_ui.drawLabel(game_font, "Deck: {d}", state.deck.count(), Layout.deck, 14, .light_gray, Layout.card_h);
 
+    // Removed Pile
     if (state.removed_pile.count() > 0) {
         gui_card.drawCardBack(card_texture, Layout.removed, Layout.card_w, Layout.card_h);
     }
     gui_ui.drawLabel(game_font, "Removed: {d}", state.removed_pile.count(), Layout.removed, 14, .light_gray, Layout.card_h);
 
+    // Field
     for (field_visuals) |maybe_v| if (maybe_v) |v| v.draw(card_texture, Layout.card_w, Layout.card_h);
+
+    // Flying
     for (flying_visuals) |maybe_v| if (maybe_v) |v| v.draw(card_texture, Layout.card_w, Layout.card_h);
 
+    // Weapon
     if (weapon_visual) |v| {
         v.draw(card_texture, Layout.card_w, Layout.card_h);
         gui_ui.drawLabel(game_font, "Weapon", null, Layout.weapon, 14, .gold, Layout.card_h);
     }
 
+    // Monster Stack
     if (monster_visuals[0]) |v| {
         v.draw(card_texture, Layout.card_w, Layout.card_h);
         gui_ui.drawLabel(game_font, "Stack: {d}", state.monster_stack.count(), Layout.monster_stack, 14, .red, Layout.card_h);
     }
 
+    // Status / HP
     var hp_buf: [32]u8 = undefined;
     const hp_text = std.fmt.bufPrintZ(&hp_buf, "HEALTH: {d}/{d}", .{ state.health, state.max_health }) catch "HP ERROR";
     rl.drawTextEx(game_font, hp_text, .{ .x = Layout.margin_x, .y = Layout.bottom_y }, 24, 1, if (state.health <= 5) .red else .ray_white);
 
+    // Escape / Next Room Button
     if (state.canAdvanceRoom()) {
         gui_ui.drawButton(game_font, UI.escape_btn_x, UI.escape_btn_y, UI.btn_w, UI.btn_h, "NEXT ROOM", .dark_green);
     } else {
@@ -334,6 +359,7 @@ export fn updateDrawFrame() void {
         gui_ui.drawButton(game_font, UI.escape_btn_x, UI.escape_btn_y, UI.btn_w, UI.btn_h, "ESCAPE", btn_color);
     }
 
+    // Combat Choice Overlay
     if (selected_monster) |m_idx| {
         const btn_y = Layout.top_y + Layout.card_h + 10;
         const btn_x = Layout.field_x + @as(f32, @floatFromInt(m_idx)) * (Layout.card_w + Layout.card_spacing);
