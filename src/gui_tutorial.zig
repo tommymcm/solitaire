@@ -36,23 +36,23 @@ pub const TutorialState = struct {
             rl.drawRectangle(0, 0, screen_w, screen_height, dim_color);
         }
 
-        const box_y = switch (step.box_pos) {
-            .top => box_config.y_top,
-            .center => box_config.y_center,
-            .bottom => box_config.y_bottom,
+        const box_y: i32 = switch (step.box_pos) {
+            .top => @as(i32, box_config.y_top),
+            .center => @as(i32, box_config.y_center),
+            .bottom => @as(i32, box_config.y_bottom),
         };
 
         const box_rect = rl.Rectangle{ .x = box_config.x, .y = @as(f32, @floatFromInt(box_y)), .width = box_config.w, .height = box_config.h };
         rl.drawRectangleRec(box_rect, .dark_gray);
         rl.drawRectangleLinesEx(box_rect, 2, .ray_white);
 
-        gui_ui.drawTextWrapped(font, step.text, @as(i32, @intFromFloat(box_config.x)) + box_config.text_margin, box_y + box_config.text_margin, @as(i32, @intFromFloat(box_config.w)) - (box_config.text_margin * 2), 20, .ray_white);
+        gui_ui.drawTextWrapped(font, step.text, @as(i32, @intFromFloat(box_config.x)) + @as(i32, box_config.text_margin), box_y + @as(i32, box_config.text_margin), @as(i32, @intFromFloat(box_config.w)) - (@as(i32, box_config.text_margin) * 2), 20, .ray_white);
 
         const tut_btn_y = @as(f32, @floatFromInt(box_y)) + box_config.h - box_config.btn_h - @as(f32, @floatFromInt(box_config.text_margin));
         const tut_next_btn_x = box_config.x + box_config.w - box_config.btn_w - @as(f32, @floatFromInt(box_config.text_margin));
         const tut_prev_btn_x = tut_next_btn_x - box_config.btn_w - @as(f32, @floatFromInt(box_config.text_margin));
 
-        gui_ui.drawButton(font, @as(i32, @intFromFloat(box_config.x)) + box_config.text_margin, @as(i32, @intFromFloat(tut_btn_y)), @as(i32, @intFromFloat(box_config.btn_w)), @as(i32, @intFromFloat(box_config.btn_h)), "CLOSE", .maroon);
+        gui_ui.drawButton(font, @as(i32, @intFromFloat(box_config.x)) + @as(i32, box_config.text_margin), @as(i32, @intFromFloat(tut_btn_y)), @as(i32, @intFromFloat(box_config.btn_w)), @as(i32, @intFromFloat(box_config.btn_h)), "CLOSE", .maroon);
         if (self.current_step > 0) {
             gui_ui.drawButton(font, @as(i32, @intFromFloat(tut_prev_btn_x)), @as(i32, @intFromFloat(tut_btn_y)), @as(i32, @intFromFloat(box_config.btn_w)), @as(i32, @intFromFloat(box_config.btn_h)), "PREV", .dark_gray);
         }
@@ -62,10 +62,10 @@ pub const TutorialState = struct {
     pub fn handleInput(self: *TutorialState, mouse: rl.Vector2, box_config: anytype) bool {
         if (!self.active) return false;
         const step = self.steps[self.current_step];
-        const box_y = switch (step.box_pos) {
-            .top => box_config.y_top,
-            .center => box_config.y_center,
-            .bottom => box_config.y_bottom,
+        const box_y: i32 = switch (step.box_pos) {
+            .top => @as(i32, box_config.y_top),
+            .center => @as(i32, box_config.y_center),
+            .bottom => @as(i32, box_config.y_bottom),
         };
 
         const tut_btn_y = @as(f32, @floatFromInt(box_y)) + box_config.h - box_config.btn_h - @as(f32, @floatFromInt(box_config.text_margin));
