@@ -417,7 +417,7 @@ fn processInput() void {
         }
 
         if (global_state.phase == .game_over) {
-            if (rl.checkCollisionPointRec(mouse, .{ .x = CONFIRM_BTN_X, .y = 250, .width = BTN_W, .height = BTN_H })) {
+            if (rl.checkCollisionPointRec(mouse, .{ .x = CONFIRM_BTN_X, .y = BTN_ROW_Y, .width = BTN_W, .height = BTN_H })) {
                 restartGame() catch {};
             }
             return;
