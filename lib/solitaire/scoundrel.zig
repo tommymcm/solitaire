@@ -79,7 +79,6 @@ pub const ScoundrelState = struct {
             }
         }
         self.cards_interacted_in_room = 0;
-        self.last_action_escaped = false;
     }
 
     pub fn escape(self: *ScoundrelState) !bool {
@@ -125,6 +124,7 @@ pub const ScoundrelState = struct {
         }
 
         self.cards_interacted_in_room += 1;
+        self.last_action_escaped = false; // Must face at least one card before escaping again
         self.checkGameState();
     }
 
