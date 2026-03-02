@@ -101,15 +101,10 @@ pub const ScoundrelState = struct {
     }
 
     pub fn canAdvanceRoom(self: ScoundrelState) bool {
-        // Player can advance if they've used 3 cards, or if the field is empty (rare case)
-        if (self.cards_interacted_in_room >= 3) return true;
-
-        var field_empty = true;
-        for (self.field) |slot| if (slot != null) {
-            field_empty = false;
-            break;
-        };
-        return field_empty;
+        // Player can advance if they've used at least 3 cards AND there are cards left in the deck.
+        // If the deck is empty, they must clear the field entirely.
+        if (self.deck.count() == 0) return false;
+        return self.cards_interacted_in_room >= 3;
     }
 
     pub fn canUseWeapon(self: ScoundrelState, monster_val: i32) bool {
@@ -125,7 +120,9 @@ pub const ScoundrelState = struct {
     pub fn useCard(self: *ScoundrelState, field_idx: usize, use_weapon: bool) !void {
         if (field_idx >= 4) return error.InvalidIndex;
         if (self.field[field_idx] == null) return error.EmptySlot;
-        if (self.cards_interacted_in_room >= 3) return error.RoomComplete;
+        
+        // Only enforce the 3-card limit if there are more rooms to come
+        if (self.deck.count() > 0 and self.cards_interacted_in_room >= 3) return error.RoomComplete;
 
         const card = self.field[field_idx].?;
 
@@ -136,7 +133,12 @@ pub const ScoundrelState = struct {
         }
 
         self.cards_interacted_in_room += 1;
-        self.last_action_escaped = false; // Must face at least one card before escaping again
+        
+        // Reset escape flag only when the room is "finished" (3 cards interacted with)
+        if (self.cards_interacted_in_room >= 3) {
+            self.last_action_escaped = false;
+        }
+        
         self.checkGameState();
     }
 
