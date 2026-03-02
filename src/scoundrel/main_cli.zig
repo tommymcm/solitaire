@@ -51,69 +51,74 @@ pub fn main() !void {
             }
         }
         try stdout.print("\n", .{});
-        try stdout.flush();
 
-        // Auto-advance if room is empty
-        var field_empty = true;
-        for (state.field) |slot| if (slot != null) {
-            field_empty = false;
-            break;
-        };
-
-        if (field_empty) {
-            if (state.deck.count() == 0) break;
-            try stdout.print("\nRoom cleared! Press Enter to deal next room...", .{});
-            try stdout.flush();
-            _ = try stdin.readUntilDelimiterOrEof(&stdin_buf, '\n');
-            try state.dealRoom();
-            continue;
+        // Auto-advance if room is cleared or player must advance
+        if (state.canAdvanceRoom()) {
+            if (state.deck.count() == 0 and state.canAdvanceRoom()) {
+                // If deck is empty, we still need to finish the current field
+                var all_done = true;
+                for (state.field) |slot| if (slot != null) { all_done = false; break; };
+                if (all_done) break;
+            } else {
+                try stdout.print("\nRoom interaction limit reached (3 cards) or cleared! Press Enter to deal next room...", .{});
+                try stdout.flush();
+                _ = (try stdin.takeDelimiter('\n')) orelse break;
+                try state.dealRoom();
+                continue;
+            }
         }
 
         try stdout.print("\nOptions: (1-4) Use Card, (e)scape, (q)uit\n", .{});
         try stdout.print("Choose action: ", .{});
         try stdout.flush();
 
-        const line = (try stdin.readUntilDelimiterOrEof(&stdin_buf, '\n')) orelse break;
-        const trimmed = std.mem.trim(u8, line, " \r\n\t");
-        if (trimmed.len == 0) continue;
+        if (try stdin.takeDelimiter('\n')) |line| {
+            const trimmed = std.mem.trim(u8, line, " \r\n\t");
+            if (trimmed.len == 0) continue;
 
-        if (trimmed[0] == 'q') break;
-        if (trimmed[0] == 'e') {
-            if (try state.escape()) {
-                try stdout.print("Escaped to a new room!\n", .{});
-            } else {
-                try stdout.print("Cannot escape! You must clear the room or you already escaped once.\n", .{});
-            }
-            continue;
-        }
-
-        if (trimmed[0] >= '1' and trimmed[0] <= '4') {
-            const idx = @as(usize, trimmed[0] - '1');
-            const card = state.field[idx] orelse {
-                try stdout.print("Slot is empty!\n", .{});
+            if (trimmed[0] == 'q') break;
+            if (trimmed[0] == 'e') {
+                if (try state.escape()) {
+                    try stdout.print("Escaped to a new room!\n", .{});
+                } else {
+                    try stdout.print("Cannot escape! You must clear the room or you already escaped once.\n", .{});
+                }
+                try stdout.flush();
                 continue;
-            };
+            }
 
-            var use_weapon = true;
-            if (card.suit == .spades or card.suit == .clubs) {
-                if (state.active_card != null) {
-                    try stdout.print("Fight with weapon? (y/n): ", .{});
+            if (trimmed[0] >= '1' and trimmed[0] <= '4') {
+                const idx = @as(usize, trimmed[0] - '1');
+                const card = state.field[idx] orelse {
+                    try stdout.print("Slot is empty!\n", .{});
                     try stdout.flush();
-                    const fight_line = (try stdin.readUntilDelimiterOrEof(&stdin_buf, '\n')) orelse "y";
-                    const fight_trimmed = std.mem.trim(u8, fight_line, " \r\n\t");
-                    if (fight_trimmed.len > 0 and fight_trimmed[0] == 'n') {
-                        use_weapon = false;
+                    continue;
+                };
+
+                var use_weapon = true;
+                if (card.suit == .spades or card.suit == .clubs) {
+                    if (state.active_card != null) {
+                        try stdout.print("Fight with weapon? (y/n): ", .{});
+                        try stdout.flush();
+                        if (try stdin.takeDelimiter('\n')) |fight_line| {
+                            const fight_trimmed = std.mem.trim(u8, fight_line, " \r\n\t");
+                            if (fight_trimmed.len > 0 and fight_trimmed[0] == 'n') {
+                                use_weapon = false;
+                            }
+                        }
                     }
                 }
-            }
 
-            state.useCard(idx, use_weapon) catch |err| {
-                try stdout.print("Action failed: {any}\n", .{err});
-                continue;
-            };
-        } else {
-            try stdout.print("Unknown command: {s}\n", .{trimmed});
-        }
+                state.useCard(idx, use_weapon) catch |err| {
+                    try stdout.print("Action failed: {any}\n", .{err});
+                    try stdout.flush();
+                    continue;
+                };
+            } else {
+                try stdout.print("Unknown command: {s}\n", .{trimmed});
+                try stdout.flush();
+            }
+        } else break;
     }
 
     try stdout.print("\n==================================================\n", .{});

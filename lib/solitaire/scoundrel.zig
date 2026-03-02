@@ -68,44 +68,38 @@ pub const ScoundrelState = struct {
     }
 
     pub fn dealRoom(self: *ScoundrelState) !void {
-        // Move remaining field cards to removed if we didn't escape
-        if (!self.last_action_escaped) {
-            for (&self.field) |*slot| {
-                if (slot.*) |c| {
-                    try self.removed_pile.append(c);
-                    slot.* = null;
-                }
-            }
-        }
+        // In Scoundrel, the 4th card stays in the room if it wasn't used.
+        // We only deal cards to empty slots.
+        // Note: escape() already handles clearing the field to the bottom of the deck.
 
-        // Deal 4 cards
-        for (0..4) |i| {
-            self.field[i] = self.deck.draw();
+        // Deal cards to fill empty slots back up to 4
+        for (&self.field) |*slot| {
+            if (slot.* == null) {
+                slot.* = self.deck.draw();
+            }
         }
         self.cards_interacted_in_room = 0;
         self.last_action_escaped = false;
     }
 
-    pub fn escape(self: *ScoundrelState) !bool {
-        if (self.last_action_escaped) return false;
-        if (self.deck.count() == 0) return false;
-
-        // Move field to bottom of deck
-        for (&self.field) |*slot| {
-            if (slot.*) |c| {
-                try self.deck.putOnBottom(c);
-                slot.* = null;
-            }
-        }
-
-        self.last_action_escaped = true;
-        try self.dealRoom();
-        return true;
+    pub fn canAdvanceRoom(self: ScoundrelState) bool {
+        // Player can advance if they've used 3 cards, or if the field is empty (rare case)
+        if (self.cards_interacted_in_room >= 3) return true;
+        
+        var field_empty = true;
+        for (self.field) |slot| if (slot != null) {
+            field_empty = false;
+            break;
+        };
+        return field_empty;
     }
 
     pub fn useCard(self: *ScoundrelState, field_idx: usize, use_weapon: bool) !void {
         if (field_idx >= 4) return error.InvalidIndex;
-        const card = self.field[field_idx] orelse return error.EmptySlot;
+        if (self.field[field_idx] == null) return error.EmptySlot;
+        if (self.cards_interacted_in_room >= 3) return error.RoomComplete;
+
+        const card = self.field[field_idx].?;
 
         switch (card.suit) {
             .hearts => try self.consumePotion(field_idx),
@@ -145,17 +139,21 @@ pub const ScoundrelState = struct {
         if (use_weapon and self.active_card != null) {
             const weapon = self.active_card.?;
             const weapon_val = @as(i32, weapon.rank.value());
+
+            // Damage is reduced by weapon value
+            const damage = @max(0, monster_val - weapon_val);
+            self.health -= damage;
+
             const last_monster_val = if (self.monster_stack.count() > 0)
                 @as(i32, self.monster_stack.cards[self.monster_stack.len - 1].rank.value())
             else
                 weapon_val;
 
             if (monster_val < last_monster_val) {
-                // Defeated with weapon - no damage taken, added to stack
+                // Follows descending rule - added to stack
                 try self.monster_stack.append(card);
             } else {
-                // Take damage even with weapon if monster is too strong
-                self.health -= monster_val;
+                // Breaking the descending rule - monster removed
                 try self.removed_pile.append(card);
             }
         } else {
